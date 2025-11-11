@@ -31,18 +31,23 @@
 
 ## 🎯 Overview
 
-**WaHoo Predict** is a Bittensor subnet that enables decentralized binary prediction markets. The platform sources events from [WAHOOPREDICT.com](https://wahoopredict.com/en/events), covering Sports, Economics, and other categories. Miners submit calibrated probability predictions (`prob_yes ∈ [0,1]`) for events before lock time, while validators score submissions using Brier scores, apply exponential moving averages (EMA), and push normalized weights on-chain.
+**WaHoo Predict** is a Bittensor subnet that enables decentralized binary prediction markets. The platform sources events from [WAHOOPREDICT.com](https://wahoopredict.com/en/events), covering Sports, Economics, and other categories. 
+
+> **⚠️ This is a validator-only repository.** Validators clone this repo to run the subnet. Miners do not need to clone this repository—they simply register on the Bittensor subnet/metagraph and use WAHOO Predict directly. Miners may reference this repo to understand validator behavior and scoring mechanisms.
+
+This repository contains the **validator-only** implementation based on the [opentensor subnet template](https://github.com/opentensor/bittensor-subnet-template).
 
 > **Note:** This platform provides data and signals only—no bookmaking functionality.
 
 ### How It Works
 
-The system operates through a coordinated workflow between miners and validators:
+The system operates through a validator workflow:
 
-1. **Miners** pull live markets from WAHOO's API, generate `prob_yes` predictions before lock time, and post signed submissions
+1. **Miner Registration**: Miners register on Bittensor subnet/metagraph with their hotkey, then go to WAHOO site and create a regular login/account to start using WAHOO Predict
 2. **Validators** publish event registries by mirroring WAHOO, freeze submissions at lock time, compute Brier scores after resolution, maintain 7-day EMAs, and convert scores to weights using `w ∝ exp(−EMA7[Brier])`
-3. **Scoring** evaluates the last pre-lock submission using Brier scores, smoothed with a 7-day EMA, with normalized weights committed every tempo
-4. **Revenue** from WAHOO affiliate programs (up to 50% rev-share/CPA) is distributed: 60% to miners, 20% to validators, and 20% to treasury
+3. **WAHOO Rankings**: Validators periodically call WAHOO API with list of hotkeys to get miner rankings based on metrics like volume, profit, etc. (filterable by time period, e.g., past 7 days)
+4. **Scoring** evaluates the last pre-lock submission using Brier scores, smoothed with a 7-day EMA, with normalized weights committed every tempo
+5. **Revenue** from WAHOO affiliate programs (up to 50% rev-share/CPA) is distributed: 60% to miners, 20% to validators, and 20% to treasury
 
 ---
 
@@ -53,70 +58,82 @@ The system operates through a coordinated workflow between miners and validators
 - 📈 **EMA Smoothing**: 7-day exponential moving average for stable weight calculation
 - 🔐 **HMAC Signing**: Secure submission authentication and anti-replay protection
 - 💰 **Affiliate Revenue Sharing**: Integrated revenue distribution system
-- 🐳 **Docker Support**: Easy deployment with Docker Compose
 - 🧪 **Comprehensive Testing**: Full test suite with pytest
 
 ---
 
 ## 🚀 Quick Start
 
+> **For Validators:** This section is for setting up and running validators. If you're a miner, you don't need to clone this repository—just register on the Bittensor subnet and use WAHOO Predict.
+
 ### Prerequisites
 
 - Python 3.10 or higher
-- PostgreSQL 12+
-- Docker and Docker Compose (optional, for containerized deployment)
+- Bittensor wallet configured for validator
 
-### Docker Compose (Recommended)
-
-The fastest way to get started:
+### Installation
 
 ```bash
 # Clone the repository
 git clone https://github.com/Bet-TyWhite/WaHoo.git
 cd WaHoo
 
-# Copy environment template
-cp .env.example .env
-
-# Edit .env with your configuration
-nano .env  # or use your preferred editor
-
-# Start services
-make up          # Start PostgreSQL and FastAPI
-make migrate     # Run database migrations
-make seed        # Seed demo data
-```
-
-The API will be available at `http://localhost:8000`
-
-### Local Development
-
-For local development without Docker:
-
-```bash
 # Create virtual environment
 python3.10 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
-
-# Set up database
-createdb wahoopredict
-
-# Run migrations
-alembic upgrade head
-
-# Seed demo data
-python -m cli.seed
-
-# Start development server
-uvicorn wahoopredict.main:app --reload
 ```
+
+### Running the Validator
+
+The validator is simple: it calls APIs, scores miner responses, and sets weights on-chain.
+
+```bash
+# Set API base URL (optional, defaults to http://localhost:8000)
+export API_BASE_URL=http://your-api-url.com
+
+# Set WAHOO API URL (optional, defaults to https://api.wahoopredict.com)
+export WAHOO_API_URL=https://api.wahoopredict.com
+
+# Run validator
+python neurons/validator.py \
+    --netuid <netuid> \
+    --wallet.name <wallet_name> \
+    --wallet.hotkey <hotkey_name> \
+    --logging.debug
+```
+
+**What the validator does:**
+1. Syncs metagraph periodically (keeps it in sync for weight setting)
+2. Gets miner rankings from WAHOO API (past 7 days)
+3. Gets weights from scoring API
+4. Queries miners for predictions
+5. Scores responses based on API data and WAHOO rankings
+6. Sets weights on-chain
+
+**No database needed** - everything comes from APIs!
 
 ---
 
 ## 🏗️ Architecture
+
+### Project Structure
+
+This project follows the [opentensor subnet template](https://github.com/opentensor/bittensor-subnet-template) structure:
+
+```
+WaHoo/
+├── template/          # Subnet template files
+│   ├── protocol.py   # Protocol definition (WAHOOPredict synapse)
+│   ├── forward.py    # Validator forward pass
+│   └── reward.py     # Reward mechanism
+├── neurons/          # Neuron implementations
+│   └── validator.py  # Validator implementation
+├── wahoopredict/     # FastAPI service and database models
+└── cli/              # CLI tools for seeding, scoring, etc.
+```
 
 ### Scoring System (v1)
 
@@ -150,7 +167,9 @@ score_i = exp(−EMA7_Brier_i) × (1 + λ₁·sqrt(usage_i) + λ₂·EMA7(referr
 - `referrals_i`: Qualified first deposits from miner funnels
 - `λ₁, λ₂`: Small coefficients (0.1–0.2) to keep performance as the primary factor
 
-### Database Schema
+### Database Schema (Reference Only)
+
+> **Note:** Validators don't need a database. This schema is for reference only to understand how the scoring API works.
 
 | Table | Description |
 |-------|-------------|
@@ -177,6 +196,37 @@ score_i = exp(−EMA7_Brier_i) × (1 + λ₁·sqrt(usage_i) + λ₂·EMA7(referr
 ---
 
 ## 📚 API Documentation
+
+### WAHOO API Integration
+
+Validators call WAHOO API to get miner rankings. See [WAHOO API Requirements](docs/WAHOO_API_REQUIREMENTS.md) for detailed specifications.
+
+**Endpoint:** `POST /api/v1/miners/rankings`
+
+**Request:**
+```json
+{
+  "hotkeys": ["5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"],
+  "start_date": "2024-01-01T00:00:00Z",  // Optional
+  "end_date": "2024-01-08T00:00:00Z",    // Optional
+  "metrics": ["volume", "profit"]        // Optional
+}
+```
+
+**Response:**
+```json
+{
+  "rankings": [
+    {
+      "ss58_address": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+      "rank": 1,
+      "volume": 1000.0,
+      "profit": 500.0,
+      "metrics": {...}
+    }
+  ]
+}
+```
 
 ### Core Endpoints
 
@@ -286,22 +336,6 @@ https://wahoopredict.com/markets/{MARKET_ID}?utm_source=aff&utm_campaign={AFFID}
 
 ## 🛠️ Development
 
-### CLI Commands
-
-```bash
-# Seed demo data
-python -m cli.seed
-
-# Resolve an event
-python -m cli.resolve --event wahoo_2024_election --outcome true --source "https://wahoopredict.com/results/2024-election"
-
-# Score miners (compute Brier, update EMA, recalculate weights)
-python -m cli.score
-
-# Export weights for on-chain weight setting
-python -m cli.export_weights
-```
-
 ### Testing
 
 ```bash
@@ -312,26 +346,10 @@ pytest tests/
 pytest --cov=wahoopredict tests/
 ```
 
-### Database Migrations
-
-```bash
-# Create a new migration
-alembic revision --autogenerate -m "description"
-
-# Apply migrations
-alembic upgrade head
-
-# Rollback one migration
-alembic downgrade -1
-```
 
 ### Makefile Commands
 
 ```bash
-make up          # Start Docker services
-make down        # Stop Docker services
-make migrate     # Run Alembic migrations
-make seed        # Seed demo data
 make test        # Run tests
 make clean       # Clean temporary files
 ```
@@ -340,33 +358,55 @@ make clean       # Clean temporary files
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | Required |
-| `API_SECRET` | Secret for HMAC verification | Required |
-| `WAHOO_BASE_URL` | WAHOOPREDICT API base URL | `https://api.wahoopredict.com` |
-| `LOG_LEVEL` | Logging level | `INFO` |
+| `API_BASE_URL` | Base URL for scoring API (weights endpoint) | `http://localhost:8000` |
+| `WAHOO_API_URL` | Base URL for WAHOO API (rankings endpoint) | `https://api.wahoopredict.com` |
 
 ---
 
-## 👥 Roles & Responsibilities
+## 👥 For Miners
 
-### How Miners Work
+**Miners do NOT need to clone this repository.** To participate:
 
-1. **Pull Events**: Fetch live markets from WAHOO API (`/events` or `/event/events-list`)
-2. **Generate Predictions**: Produce `prob_yes ∈ [0,1]` for each outcome before lock time
-   - Your approach can be ML, news scraping, statistical models, or any method—only accuracy matters
-3. **Post Submissions**: Submit one signed submission per event before lock time
-   - Only the final pre-lock submission counts toward scoring
-   - Include manifest hash for de-duplication
-4. **Objective**: Minimize Brier score after event resolution
+1. **Register on Bittensor subnet/metagraph** with your hotkey
+2. **Go to WAHOO site** and create a regular login/account
+3. **Start using WAHOO Predict** - that's it!
+
+You may reference this repository to understand:
+- How validators score your predictions (see `template/reward.py` and `wahoopredict/services/scoring.py`)
+- How validators query miners (see `neurons/validator.py`)
+- The protocol definition (see `template/protocol.py`)
+
+But you don't need to run any code from this repository.
+
+---
+
+## 👥 Validator Responsibilities
 
 ### How Validators Work
 
-1. **Publish Registry**: Mirror WAHOO (`/event/events-list`) and stamp with `lock_time` and resolution rules/links
-2. **Freeze Book**: At lock time, reject all new submissions
-3. **Compute Scores**: Once WAHOO settles (via `settled_prediction` postback), compute Brier scores per miner
-4. **Maintain EMA**: Calculate and update 7-day EMA of each miner's Brier scores
-5. **Set Weights**: Convert to weights using `w ∝ exp(−EMA7[Brier])`, normalize, and commit every tempo
-6. **Anti-Grift**: Reject late submissions, flag duplicate manifests, penalize low coverage
+The validator runs a simple loop:
+
+1. **Sync Metagraph**: Call `subtensor.metagraph(netuid)` to keep metagraph in sync for weight setting
+2. **Get WAHOO Rankings**: Call WAHOO API with list of hotkeys to get miner rankings (past 7 days) based on metrics like volume, profit, etc.
+3. **Get Weights from API**: Call scoring API to get normalized weights (computed from EMA(7d) Brier scores)
+4. **Query Miners**: Query miners for predictions on active events
+5. **Score Responses**: Score miner responses based on:
+   - API weights (priority 1)
+   - WAHOO rankings (priority 2)
+   - Response validity (priority 3)
+6. **Set Weights On-Chain**: Normalize scores and set weights on-chain using `subtensor.set_weights()`
+
+**No database needed** - all data comes from APIs. The validator is stateless and simple.
+
+### Understanding Miner Behavior
+
+From a validator's perspective:
+
+1. **Miners register on Bittensor subnet/metagraph** with their hotkey
+2. **Miners go to WAHOO site** and create a regular login/account
+3. **Miners start using WAHOO Predict** - no additional hotkey verification needed during signup
+4. **Analytics**: Analytics stay with internal account ID, not the user. Only current hotkey has analytics. Miners can change hotkey in settings (old key loses analytics, new key gets analytics)
+
 
 ---
 

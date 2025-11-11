@@ -10,7 +10,9 @@ import bittensor as bt
 class WAHOOPredict(bt.Synapse):
     """
     Protocol for WAHOOPREDICT subnet.
+    
     Validators query miners for predictions on binary events.
+    Miners respond with probability predictions (prob_yes ∈ [0,1]).
     """
     
     # Event to predict
