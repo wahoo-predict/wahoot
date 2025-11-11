@@ -1,7 +1,7 @@
 """
 WAHOOPREDICT - Reward mechanism.
 
-Defines how validators reward miner responses based on API data.
+Defines how validators reward miner responses based on WAHOO performance data.
 """
 
 import bittensor as bt
@@ -12,12 +12,13 @@ import httpx
 from template.protocol import WAHOOPredict
 
 
-def get_weights_from_api(api_base_url: str) -> Dict[str, float]:
+def get_weights_from_api(api_base_url: str, validator_db: any = None) -> Dict[str, float]:
     """
-    Get normalized weights from API.
+    Get normalized weights from API (optional fallback).
     
     Args:
         api_base_url: Base URL for the API
+        validator_db: Optional validator database for backup
         
     Returns:
         Dictionary mapping miner_id (hotkey) to weight
@@ -26,9 +27,22 @@ def get_weights_from_api(api_base_url: str) -> Dict[str, float]:
         response = httpx.get(f"{api_base_url}/weights", timeout=10.0)
         if response.status_code == 200:
             weights_data = response.json()
-            return {w["miner_id"]: w["weight"] for w in weights_data.get("weights", [])}
+            weights = {w["miner_id"]: w["weight"] for w in weights_data.get("weights", [])}
+            
+            # Cache weights in validator DB if available
+            if validator_db:
+                validator_db.cache_weights(weights)
+            
+            return weights
     except Exception as e:
         bt.logging.warning(f"Failed to get weights from API: {e}")
+        
+        # Fallback to cached weights if API fails
+        if validator_db:
+            cached_weights = validator_db.get_cached_weights()
+            if cached_weights:
+                bt.logging.info(f"Using cached weights from backup database ({len(cached_weights)} miners)")
+                return cached_weights
     
     return {}
 
@@ -39,62 +53,50 @@ def reward(
     uids: List[int],
     metagraph: "bt.metagraph.Metagraph",
     api_base_url: str = "http://localhost:8000",
-    wahoo_rankings: List[Dict[str, Any]] = None,
+    wahoo_weights: Dict[str, float] = None,
+    wahoo_validation_data: List[Dict[str, Any]] = None,
+    validator_db: any = None,
 ) -> torch.FloatTensor:
     """
-    Reward miners based on their responses and API data.
+    Reward miners based on their responses and WAHOO performance data.
     
     This function computes rewards for miners based on:
-    1. API weights (computed from EMA(7d) Brier scores)
-    2. WAHOO API rankings (volume, profit, etc.)
-    3. Response validity (fallback if no API weight available)
+    1. WAHOO weights (computed from performance metrics) - PRIMARY
+    2. API weights (optional fallback from scoring API)
+    3. Response validity (fallback if no weight available)
     
     Args:
         validator: The validator neuron instance (unused, kept for compatibility)
         responses: List of miner responses
         uids: List of miner UIDs
         metagraph: The metagraph
-        api_base_url: Base URL for the API
-        wahoo_rankings: Optional list of miner rankings from WAHOO API
+        api_base_url: Base URL for the API (optional fallback)
+        wahoo_weights: Pre-computed weights from WAHOO validation data (PRIMARY)
+        wahoo_validation_data: Optional list of validation data from WAHOO API
+        validator_db: Optional validator database for backup
         
     Returns:
         Tensor of rewards for each miner
     """
-    # Get weights from API
-    db_weights = get_weights_from_api(api_base_url)
+    # Get weights from API (optional fallback)
+    db_weights = get_weights_from_api(api_base_url, validator_db=validator_db)
     
-    # Create mapping of hotkey to WAHOO ranking
-    wahoo_weights = {}
-    if wahoo_rankings:
-        for ranking in wahoo_rankings:
-            hotkey = ranking.get("ss58_address") or ranking.get("hotkey")
-            if hotkey:
-                # Use rank or metrics to compute weight
-                rank = ranking.get("rank", 999)
-                volume = ranking.get("volume", 0.0)
-                profit = ranking.get("profit", 0.0)
-                
-                # Combine metrics (normalize by rank, weight by volume/profit)
-                # Lower rank number = better rank
-                rank_weight = 1.0 / max(rank, 1)  # Inverse rank
-                volume_weight = float(volume) / 1000.0 if volume > 0 else 0.0  # Normalize volume
-                profit_weight = float(profit) / 100.0 if profit > 0 else 0.0  # Normalize profit
-                
-                # Combined weight from WAHOO rankings
-                wahoo_weights[hotkey] = rank_weight * (1.0 + volume_weight + profit_weight)
-    
-    # Initialize rewards tensor
+    # Initialize rewards tensor (PyTorch tensor, shape: [len(uids)])
+    # This tensor will be posted to the blockchain
     rewards = torch.zeros(len(uids))
     
-    # Score each miner
+    # Score each miner and assign weight to corresponding index in tensor
+    # The index in rewards[idx] corresponds to uids[idx]
     for idx, (uid, response) in enumerate(zip(uids, responses)):
         miner_id = metagraph.hotkeys[uid]
         
-        # Priority: 1. API weights, 2. WAHOO rankings, 3. Response validity
-        if miner_id in db_weights:
-            rewards[idx] = db_weights[miner_id]
-        elif miner_id in wahoo_weights:
+        # Priority: 1. WAHOO weights (PRIMARY), 2. API weights (fallback), 3. Response validity
+        if wahoo_weights and miner_id in wahoo_weights:
+            # Use pre-computed weight from WAHOO scoring
             rewards[idx] = wahoo_weights[miner_id]
+        elif db_weights and miner_id in db_weights:
+            # Fallback to API weights if available
+            rewards[idx] = db_weights[miner_id]
         elif response is not None and hasattr(response, 'prob_yes'):
             # Fallback: score based on response validity
             if 0.0 <= response.prob_yes <= 1.0:
@@ -104,9 +106,12 @@ def reward(
         else:
             rewards[idx] = 0.0
     
-    # Normalize rewards
+    # Normalize rewards to sum to 1.0 (required by Bittensor)
+    # This ensures the weights are properly distributed
     total = rewards.sum()
     if total > 0:
         rewards = rewards / total
     
+    # Return PyTorch tensor that will be posted to blockchain
+    # Shape: [len(uids)], values sum to 1.0
     return rewards
