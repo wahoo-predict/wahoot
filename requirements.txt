@@ -9,3 +9,6 @@ torch>=2.0.0
 
 # Utilities
 python-dotenv>=1.0.0
+
+# Code formatting
+black>=23.0.0
