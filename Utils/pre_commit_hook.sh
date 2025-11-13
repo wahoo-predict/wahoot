@@ -4,9 +4,9 @@
 # Install: cp Utils/pre_commit_hook.sh .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
 #
 
-# Get the directory of this script
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+# Get the project root using git (most reliable method)
+# This works whether running as a hook or from command line
+PROJECT_ROOT="$(git rev-parse --show-toplevel)"
 
 # Get list of staged Python files
 STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep "\.py$")
