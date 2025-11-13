@@ -7,7 +7,6 @@ Stores minimal data: hotkeys, validation data cache, and weights.
 
 import sqlite3
 import json
-import os
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
 from pathlib import Path

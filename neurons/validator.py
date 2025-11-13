@@ -6,7 +6,6 @@ Simple loop: sync metagraph → get WAHOO validation data → query miners → s
 """
 
 import bittensor as bt
-import torch
 import time
 import os
 import httpx

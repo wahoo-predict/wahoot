@@ -170,7 +170,7 @@ def format_file(
             print(f"  ⚠️  {issue}")
         all_passed = False
     elif verbose:
-        print(f"  ✓ Class naming: OK")
+        print("  ✓ Class naming: OK")
 
     # Format with black
     success, message = format_with_black(file_path, check_only=check_only)
@@ -179,7 +179,7 @@ def format_file(
         all_passed = False
     elif verbose:
         if check_only and "already formatted" in message:
-            print(f"  ✓ Black formatting: OK")
+            print("  ✓ Black formatting: OK")
         else:
             print(f"  ✓ Black formatting: {message}")
 

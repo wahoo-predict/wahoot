@@ -5,7 +5,7 @@ Validators use this to score miners based on WAHOO API performance data.
 Ranks miners by spending and volume, then combines rankings into final weights.
 """
 
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any
 
 
 def rank_miners_by_metric(
