@@ -1,0 +1,32 @@
+name: Format Check
+
+on:
+  pull_request:
+    branches: [ main, master ]
+  push:
+    branches: [ main, master ]
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      
+      - name: Install dependencies
+        run: |
+          pip install black flake8
+      
+      - name: Check formatting with Black
+        run: black --check --line-length=88 .
+      
+      - name: Lint with Flake8
+        run: flake8 --max-line-length=88 --extend-ignore=E203,E266,E501,W503 .
+      
+      - name: Run custom format checks
+        run: python3 Utils/format_check.py $(find . -name "*.py" -not -path "./.git/*" -not -path "./venv/*" -not -path "./.venv/*")
+
