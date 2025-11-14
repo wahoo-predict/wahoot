@@ -22,8 +22,16 @@ jobs:
           pip install black flake8
       
       - name: Check formatting with Black
-        run: black --check --line-length=88 .
+        run: |
+          black --check --line-length=88 . || {
+            echo "::error::Code formatting failed. Run 'black .' locally to fix."
+            exit 1
+          }
       
       - name: Lint with Flake8
-        run: flake8 --max-line-length=88 --extend-ignore=E203,E266,E501,W503 .
+        run: |
+          flake8 --max-line-length=88 --extend-ignore=E203,E266,E501,W503 . || {
+            echo "::error::Linting failed. Fix the issues above, then run 'black .' to format."
+            exit 1
+          }
 
