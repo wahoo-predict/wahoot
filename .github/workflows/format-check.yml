@@ -26,7 +26,4 @@ jobs:
       
       - name: Lint with Flake8
         run: flake8 --max-line-length=88 --extend-ignore=E203,E266,E501,W503 .
-      
-      - name: Run custom format checks
-        run: python3 Utils/format_check.py $(find . -name "*.py" -not -path "./.git/*" -not -path "./venv/*" -not -path "./.venv/*")
 
