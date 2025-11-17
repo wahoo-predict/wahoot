@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS performance_snapshots (
 );
 
 CREATE INDEX IF NOT EXISTS idx_perf_hotkey_ts
-    ON performance_snapshots(hotkey, ts);
+    ON performance_snapshots(hotkey, timestamp);
 
 CREATE TABLE IF NOT EXISTS scoring_runs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
