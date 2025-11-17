@@ -17,7 +17,7 @@ import torch
 from typing import Dict, List, Optional, Any
 
 # Note: Weights are calculated locally by each validator, not fetched from API.
-# The wahoo_client.py module is for fetching DATA from WAHOO Predict API
+# The ValidationAPIClient (wahoo/client.py) is for fetching DATA from WAHOO Predict API
 # (trading statistics, validation data), not for fetching weights.
 
 
@@ -87,7 +87,7 @@ def reward(
     uids: List[int],
     metagraph: Any,
     wahoo_weights: Optional[Dict[str, float]] = None,
-    wahoo_validation_data: Optional[List[Dict[str, Any]]] = None,
+    wahoo_validation_data: Optional[List[Any]] = None,
 ) -> torch.FloatTensor:
     """
     Compute rewards for miners using a strict priority system.
@@ -111,7 +111,8 @@ def reward(
         uids: List of miner UIDs corresponding to responses
         metagraph: Bittensor metagraph object for hotkey lookup
         wahoo_weights: Optional dict mapping hotkey to weight from local scoring
-        wahoo_validation_data: Optional validation data (for future use)
+                      (typically from OperatorPipeline)
+        wahoo_validation_data: Optional validation data (ValidationRecord objects from API)
 
     Returns:
         torch.FloatTensor: Normalized reward tensor with shape (len(uids),)

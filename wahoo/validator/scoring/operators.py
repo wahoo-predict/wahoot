@@ -6,7 +6,7 @@ from typing import Any, Dict, Sequence
 import numpy as np
 import pandas as pd
 
-from .dataframe import ensure_required_columns
+from ..dataframe import ensure_required_columns
 
 # This file is where we will implement and define the scoring functions
 # These are fed into the general scoring pipeline

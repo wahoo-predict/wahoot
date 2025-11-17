@@ -11,7 +11,7 @@ import httpx
 from dotenv import load_dotenv
 from pydantic import ValidationError
 
-from .models import ValidationRecord
+from ..models import ValidationRecord
 
 load_dotenv()
 
@@ -51,6 +51,7 @@ class ValidationAPIClient:
         resolved_url = base_url or os.getenv(
             "WAHOO_VALIDATION_ENDPOINT", DEFAULT_VALIDATION_ENDPOINT
         )
+        # base_url should be the full endpoint URL, not just base
         self.base_url = resolved_url.rstrip("/")
         self.timeout = timeout
         self.max_retries = max_retries
@@ -122,7 +123,9 @@ class ValidationAPIClient:
         return deduped
 
     def _request_with_retries(self, params: Dict[str, str]) -> httpx.Response:
-        url = f"{self.base_url}/api/v2/users/validation"
+        # Use the endpoint from base_url (which comes from DEFAULT_VALIDATION_ENDPOINT)
+        # The base_url already includes the full path, so use it directly
+        url = self.base_url
         attempt = 0
         while attempt < self.max_retries:
             attempt += 1
