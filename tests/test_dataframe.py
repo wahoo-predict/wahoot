@@ -1,8 +1,8 @@
 import pandas as pd
 import pytest
 
-from wahoo.models import PerformanceMetrics, ValidationRecord
-from wahoo.dataframe import records_to_dataframe, ensure_required_columns
+from wahoo import PerformanceMetrics, ValidationRecord
+from wahoo import records_to_dataframe, ensure_required_columns
 
 
 def test_records_to_dataframe_basic():
