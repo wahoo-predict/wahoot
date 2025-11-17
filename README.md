@@ -139,7 +139,13 @@ We keep the scoring simple and transparent. Every miner gets evaluated on three 
 - **Realized Profit (USD)** – Are they making money or losing it?
 - **Win Rate** – Are their predictions actually good, or are they just guessing?
 
-The algorithm ranks everyone by these metrics and hands out rewards proportionally. Fair is fair. Want to see exactly how the sausage is made? Check out `neurons/scoring.py` for all the code.
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `API_BASE_URL` | Scoring API base URL | `http://localhost:8000` |
+| `WAHOO_API_URL` | WAHOO API base URL | `https://api.wahoopredict.com` |
+| `WAHOO_VALIDATION_ENDPOINT` | Full validation endpoint used by validators (overrides default statistics URL) | `https://api.wahoopredict.com/api/v2/event/bittensor/statistics` |
+| `USE_VALIDATOR_DB` | Enable SQLite backup | `false` |
+| `VALIDATOR_DB_PATH` | Custom database path | `~/.wahoo/validator.db` |
 
 ---
 
