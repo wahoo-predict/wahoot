@@ -9,8 +9,13 @@ on:
 jobs:
   format:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -21,12 +26,32 @@ jobs:
         run: |
           pip install black flake8
       
-      - name: Check formatting with Black
+      - name: Configure Git
         run: |
-          black --check --line-length=88 . || {
-            echo "::error::Code formatting failed. Run 'black .' locally to fix."
-            exit 1
-          }
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+      
+      - name: Check formatting with Black
+        id: check_format
+        run: |
+          if ! black --check --line-length=88 .; then
+            echo "needs_formatting=true" >> $GITHUB_OUTPUT
+            echo "::warning::Formatting failed - will auto format now"
+          else
+            echo "needs_formatting=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Auto format with Black
+        if: steps.check_format.outputs.needs_formatting == 'true'
+        run: |
+          black --line-length=88 .
+      
+      - name: Commit formatted code
+        if: steps.check_format.outputs.needs_formatting == 'true'
+        run: |
+          git add .
+          git commit -m "Auto-format code with Black" || exit 0
+          git push || exit 0
       
       - name: Lint with Flake8
         run: |

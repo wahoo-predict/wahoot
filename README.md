@@ -1,10 +1,14 @@
+<div align="center">
+
 # WaHoo Predict
+
+</div>
 
 <div align="center">
 
-*We reduce life to a button. Odds, not oaths. Grift responsibly.*
+*We reduce life to a button. Prediction Markets are THE future.*
 
-**A Bittensor subnet for decentralized binary prediction markets**
+**Earn TAO rewards by trading on prediction markets. No code required.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
@@ -13,225 +17,127 @@
 
 ---
 
-## 🎯 Overview
+## 🎯 What Makes This Special?
 
-**WaHoo Predict** is a Bittensor subnet that enables decentralized binary prediction markets. Validators score miners based on their trading performance on [WAHOOPREDICT.com](https://wahoopredict.com), using real-time metrics like volume, profit, and prediction accuracy.
+Picture this: You're already trading on prediction markets, making calls on whether your favorite team will win or if that political candidate will pull through. Now imagine getting **paid in TAO** just for doing what you're already doing. That's **WaHoo Predict** – we took the prediction markets you love and added a Bittensor rewards layer on top.
 
-> **⚠️ This is a validator-only repository.** Validators clone this repo to run the subnet. Miners simply register on the Bittensor subnet and use WAHOO Predict directly.
+**No coding. No servers. No "wait, what's a Docker container?" moments.** Just trade, perform well, and watch the rewards come in.
+
+### What is WAHOO Predict? (The Fun Part)
+
+WAHOO Predict is where the action happens. While your friends are scrolling through stale news articles, you're trading on what people *actually* think is going to happen – in real-time. Politics, sports, economics, you name it. It's like having a front-row seat to the world's collective gut feeling, and you can bet on it.
+
+**Here's what makes it awesome:**
+- **Live markets** on literally everything – from "Will it rain tomorrow?" to "Will Bitcoin hit $100k?"
+- **Dead simple Yes/No bets** – no complex derivatives, no confusing options
+- **Odds that move in real-time** – watch the market react to news as it breaks
+- **Trade from anywhere** – just open your browser and go
+- **Want to automate?** Full API access for the power users
+
+### How It All Works Together (The Simple Version)
+
+Okay, here's the deal: You don't need to understand blockchain, APIs, or any of that stuff. But if you're the curious type (we like you), here's what happens behind the curtain:
+
+1. **You register** – Link your Bittensor wallet to WAHOO (seriously, 2 minutes max)
+2. **You trade** – Do your thing on WAHOO Predict like you always do
+3. **We track** – Our validators peek at your performance through the WAHOO API (don't worry, it's all public data)
+4. **You get scored** – Based on how much you trade, how much you profit, and how often you're right
+5. **You earn TAO** – Rewards hit your wallet based on your actual trading chops
+
+**The formula is simple:** Better trades = More rewards. More trades = More rewards. It's all about your real performance, not some abstract code test.
+
+### Why This Is Actually Different
+
+Let's be real – most Bittensor subnets read like a computer science textbook. You need to know Python, understand neural networks, and probably have a server running 24/7. **We said "nah" to all of that.**
+
+Here's what makes us different:
+
+- ✅ **Literally zero coding** – If you can click "Yes" or "No" on a prediction, you're qualified
+- ✅ **Real money, real performance** – We reward actual trading skills, not your ability to write a script
+- ✅ **Built on something that works** – WAHOO Predict is already live and thriving. We just added the rewards layer
+- ✅ **Nothing to hide** – Your performance is public, so you can see exactly why you're earning what you're earning
 
 ---
 
-## 👥 For Miners
+## 👥 Start Mining Today (It's Actually Fun!)
 
-**Want to participate as a miner?** It's simple:
+### Look, We Made Mining Actually Accessible
 
-1. **Register on the Bittensor subnet** with your hotkey
-2. **Sign up at [wahoopredict.com/miners](https://wahoopredict.com/miners)** with your hotkey and signature
-3. **Start trading on WAHOO Predict** - your performance automatically determines your rewards
+Here's the thing: Most Bittensor subnets make you feel like you need a PhD in computer science just to get started. We looked at that and thought, "That's dumb." So we fixed it.
 
-**That's it!** No code to run, no repository to clone. Just trade and earn.
+**No code. No servers. No "why is my terminal showing errors?" moments.** Just trade on WAHOO Predict like you normally would, and watch the TAO rewards show up in your wallet. It's that simple.
 
-### How It Works
+If you can make a prediction and click a button, you can mine. Period.
 
-- Validators periodically query the WAHOO API with all registered hotkeys
-- Your trading performance (volume, profit, win rate) determines your weight
-- Weights are set on-chain every ~100 seconds
-- Better performance = higher weight = more rewards
+### Get Started in 3 Steps (Seriously, That's It)
 
-**Questions?** Check out the [WAHOO Predict documentation](https://wahoopredict.com/docs) or join our community.
+#### Step 1: Get Your Bittensor Wallet
 
----
+You'll need a Bittensor wallet with a hotkey. Never heard of that? Totally fine. The [official Bittensor docs](https://docs.learnbittensor.org/miners) have your back. It's basically like setting up any crypto wallet – follow the steps, and you're golden.
 
-## 🚀 For Validators
+#### Step 2: Register on Our Subnet
 
-### Quick Start
-
-#### Prerequisites
-
-- Python 3.10+
-- Bittensor wallet configured for validator
-- Access to scoring API (optional, for Brier score-based weights)
-
-#### Installation
+Copy this. Paste it. Run it. Done:
 
 ```bash
-# Clone the repository
-git clone https://github.com/Bet-TyWhite/WaHoo.git
-cd WaHoo
-
-# Create virtual environment
-python3.10 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
+btcli wallet register --netuid <netuid>
 ```
 
-#### Running the Validator
+That's literally it. You're now a miner. Told you it was easy.
+
+#### Step 3: Link Everything Together
+
+Pop over to [wahoopredict.com/miners](https://wahoopredict.com/miners) and fill out the form. Takes 30 seconds. We do all the crypto verification magic behind the scenes – you just click "Submit" and move on with your life.
+
+### Now the Fun Part: Trade and Earn
+
+Alright, here's where it gets good. Once you're set up, **just trade like you always do**:
+
+- Browse events at [wahoopredict.com/en/events](https://wahoopredict.com/en/events) – see what's hot
+- Make your calls – Yes or No, that's it
+- Watch your positions – manage your trades, see how you're doing
+
+Meanwhile, in the background, we're tracking:
+- **Your trading volume** → More activity = more rewards
+- **Your profits** → Making money? Get rewarded for it
+- **Your accuracy** → Right more often? That's worth something
+
+**The math is simple:** Good trades = Good rewards. Bad trades = Less rewards. It's all tied to your actual performance, not some made-up metric. No code to debug, no servers to restart, no headaches – just trade well and get paid.
+
+---
+
+## 🛡️ Running a Validator? You're Our Hero
+
+Validators are the unsung heroes here. You're the ones making sure the best traders actually get rewarded for their skills. You pull real trading data from WAHOO Predict, evaluate everyone's performance, and make sure TAO rewards go to the right people. It's important work, and we appreciate you.
+
+### Getting Started (The Quick Version)
+
+Same drill as miners, but you're a validator:
 
 ```bash
-# Set environment variables (optional)
-export API_BASE_URL=http://your-api-url.com          # Scoring API (optional)
-export WAHOO_API_URL=https://api.wahoopredict.com    # WAHOO API (default)
-export USE_VALIDATOR_DB=true                         # Enable SQLite backup (optional)
-export VALIDATOR_DB_PATH=/path/to/validator.db       # Custom DB path (optional)
-
-# Run validator
-python neurons/validator.py \
-    --netuid <netuid> \
-    --wallet.name <wallet_name> \
-    --wallet.hotkey <hotkey_name> \
-    --logging.debug
+btcli wallet register --netuid <netuid>
 ```
 
-### What the Validator Does
+Make sure you've got the standard Bittensor validator requirements covered (stake weight, validator permit, all that jazz) and you're ready to roll.
 
-The validator runs a continuous loop (every ~100 seconds):
+### What Your Validator Does (The Automated Part)
 
-1. **Sync Metagraph** - Keeps metagraph in sync for weight setting
-2. **Get WAHOO Validation Data** - Calls `GET /api/v2/users/validation` with list of hotkeys
-3. **Query Miners** - Queries miners for predictions on active events
-4. **Compute Rewards** - Scores based on:
-   - WAHOO performance metrics (volume, profit) - **Primary**
-   - Scoring API weights (Brier scores) - **Fallback**
-   - Response validity - **Last resort**
-5. **Set Weights On-Chain** - Normalizes and commits weights to blockchain
+Your validator runs a loop that basically does all the heavy lifting:
 
-### Validator Database Backup (Optional)
+1. **Stays in sync** – Keeps up with what's happening on the blockchain
+2. **Grabs the data** – Pulls real trading stats from the WAHOO API for all the miners
+3. **Does the math** – Ranks everyone by how well they're actually trading (volume, profit, win rate) and figures out the weights
+4. **Distributes the rewards** – Posts those weights to the blockchain so TAO emissions go to the right people
 
-Validators can enable a lightweight SQLite backup database:
+The best part? It's all automated. Set it up, let it run, check on it occasionally. It's not going to demand your attention 24/7.
 
-```bash
-export USE_VALIDATOR_DB=true
-```
+### How We Score Everyone (Keeping It Fair)
 
-This will:
-- Cache validation data and weights locally
-- Automatically fall back if APIs go down
-- Store data in `~/.wahoo/validator.db` (or custom path)
-- Auto-cleanup cache older than 7 days
+We keep the scoring simple and transparent. Every miner gets evaluated on three things:
 
-**Benefits:**
-- Continue operating if AWS/API is down
-- Faster lookups for frequently accessed data
-- Historical data for analysis
-
----
-
-## 📚 API Integration
-
-### WAHOO API
-
-Validators call the WAHOO API to get miner performance data:
-
-**Endpoint:** `GET /api/v2/users/validation`
-
-**Query Parameters:**
-- `hotkeys` (required): Comma-separated list of SS58 hotkey addresses (max 246 per request)
-- `start_date` (optional): ISO 8601 datetime string (e.g., `2024-01-01T00:00:00Z`)
-- `end_date` (optional): ISO 8601 datetime string
-
-**Response:**
-```json
-{
-  "status": "success",
-  "data": [
-    {
-      "hotkey": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
-      "signature": "0x...",
-      "message": "hello",
-      "performance": {
-        "total_volume_usd": 10500.75,
-        "realized_profit_usd": 875.20,
-        "unrealized_profit_usd": 45.10,
-        "win_rate": 0.62,
-        ...
-      }
-    }
-  ]
-}
-```
-
-**Date Filtering:**
-- Both `start_date` and `end_date`: Returns data for that time range
-- Only `start_date`: Returns data from start date to now
-- Only `end_date`: Returns data from beginning to end date
-- Neither: Returns all historical data for registered miners
-
-### Scoring API (Optional)
-
-If you're running a scoring API service, validators can fetch Brier score-based weights:
-
-**Endpoint:** `GET /weights`
-
-**Response:**
-```json
-{
-  "weights": [
-    {"miner_id": "5Grwva...", "weight": 0.05},
-    ...
-  ],
-  "updated_at": "2024-01-01T00:00:00Z",
-  "sum": 1.0
-}
-```
-
----
-
-## 🏗️ Architecture
-
-### Project Structure
-
-```
-WaHoo/
-├── template/              # Subnet template files
-│   ├── protocol.py       # Protocol definition (WAHOOPredict synapse)
-│   └── reward.py         # Reward mechanism
-└── neurons/              # Neuron implementations
-    ├── validator.py      # Validator implementation
-    ├── scoring.py        # Scoring system (computes weights from WAHOO data)
-    └── validator_db.py   # SQLite backup database (optional)
-```
-
-### Scoring System
-
-Validators use `neurons/scoring.py` to compute weights from WAHOO API data:
-
-1. **Get WAHOO Validation Data** - Calls WAHOO API with list of hotkeys
-2. **Compute Weights** - Uses `compute_final_weights()` to score miners based on:
-   - `total_volume_usd` - Trading volume (normalized by 1000)
-   - `realized_profit_usd` - Closed position profits
-   - `unrealized_profit_usd` - Open position profits
-   - Formula: `raw_score = 1.0 + (volume/1000) + (profit/100)`
-3. **Normalize** - Weights are normalized to sum to 1.0
-4. **Set On-Chain** - Weights are committed to blockchain
-
-**Scoring Priority:**
-- **Primary**: WAHOO performance metrics (computed locally)
-- **Fallback**: Optional scoring API weights (if configured)
-- **Last Resort**: Response validity (ensures all responding miners get some weight)
-
-### Miner Sign-Up Flow
-
-1. Miner registers on Bittensor subnet with hotkey
-2. Miner signs a message with their hotkey (proves ownership)
-3. Miner visits `wahoopredict.com/miners` and submits:
-   - `ss58_hotkey`
-   - `signature_message` (the message they signed)
-   - `signature` (the signature)
-4. Service verifies hotkey signature → creates miner record
-5. Miner can now trade on WAHOO Predict
-
-**API Endpoints:**
-- `POST /miners/signup` - Miner registration
-- `POST /miners/verify` - Hotkey verification (for serverless/AWS)
-- `GET /miners/verification-message` - Get message to sign
-
----
-
-## ⚙️ Configuration
-
-### Environment Variables
+- **Total Volume (USD)** – Are they actually trading, or just sitting there?
+- **Realized Profit (USD)** – Are they making money or losing it?
+- **Win Rate** – Are their predictions actually good, or are they just guessing?
 
 | Variable | Description | Default |
 |----------|-------------|---------|
@@ -241,32 +147,27 @@ Validators use `neurons/scoring.py` to compute weights from WAHOO API data:
 | `USE_VALIDATOR_DB` | Enable SQLite backup | `false` |
 | `VALIDATOR_DB_PATH` | Custom database path | `~/.wahoo/validator.db` |
 
-### Validator Loop Timing
-
-- **Metagraph Sync**: Every loop iteration (~100 seconds)
-- **WAHOO API Call**: Every loop iteration
-- **Miner Queries**: Every loop iteration
-- **Weight Setting**: Every loop iteration (if rewards > 0)
-- **Cache Cleanup**: Every loop iteration (if validator DB enabled)
-
 ---
 
-## 🔧 Development
+## 📚 Need More Info? We've Got You Covered
 
-This repository is minimal and focused on validators. For development of the scoring API or other services, see the separate development repository.
+Got questions? Want to dive deeper? Here's where to go:
+
+- **Ready to trade?** Head to [wahoopredict.com](https://wahoopredict.com/en/events) and see what's happening
+- **Want to understand WAHOO better?** The [WAHOO docs](https://wahoopredict.gitbook.io/wahoopredict-docs/getting-started/what-is-wahoopredict) will fill you in
+- **New to Bittensor?** The [official Bittensor docs](https://docs.bittensor.com) are your friend
+
+Still have questions? That's cool. We're here to help make this as simple as possible.
 
 ---
 
 ## 📄 License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+MIT License - see LICENSE file for details. TL;DR: Use it, build on it, make it better.
 
 ---
 
 <div align="center">
 
-**WaHoo Predict** — *We reduce life to a button. Odds, not oaths.*
-
-Made with ❤️ for the Bittensor ecosystem
 
 </div>
