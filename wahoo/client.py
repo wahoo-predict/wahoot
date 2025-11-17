@@ -131,14 +131,19 @@ class ValidationAPIClient:
             except httpx.HTTPError as exc:
                 bt.logging.warning(f"ValidationAPI request failed: {exc}")
                 if attempt >= self.max_retries:
-                    raise ValidationAPIError("Failed to reach validation endpoint") from exc
+                    raise ValidationAPIError(
+                        "Failed to reach validation endpoint"
+                    ) from exc
                 self._sleep_backoff(attempt)
                 continue
 
             if response.status_code == 200:
                 return response
 
-            if response.status_code in RETRY_STATUS_CODES and attempt < self.max_retries:
+            if (
+                response.status_code in RETRY_STATUS_CODES
+                and attempt < self.max_retries
+            ):
                 bt.logging.warning(
                     f"ValidationAPI transient error (status={response.status_code}), retrying..."
                 )
@@ -157,7 +162,9 @@ class ValidationAPIClient:
         try:
             data = response.json()
         except ValueError as exc:
-            raise ValidationAPIError("Validation endpoint returned invalid JSON") from exc
+            raise ValidationAPIError(
+                "Validation endpoint returned invalid JSON"
+            ) from exc
 
         if isinstance(data, list):
             return data

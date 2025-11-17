@@ -35,7 +35,9 @@ class OperatorPipeline:
         dataframe_kwargs: Optional[Dict[str, Any]] = None,
     ) -> OperatorResult:
         if operator_name not in self._operators:
-            raise ValueError(f"Unknown operator '{operator_name}'. Available: {self.available()}")
+            raise ValueError(
+                f"Unknown operator '{operator_name}'. Available: {self.available()}"
+            )
         df = records_to_dataframe(records, **(dataframe_kwargs or {}))
         operator = self._operators[operator_name]
         result = operator.run(df)

@@ -33,7 +33,9 @@ def test_records_to_dataframe_basic():
 
     assert list(df["hotkey"]) == ["hk1", "hk2"]
     assert df.loc[df["hotkey"] == "hk1", "total_volume_usd"].iloc[0] == 10.0
-    assert df.loc[df["hotkey"] == "hk2", "total_volume_usd"].iloc[0] == pytest.approx(14.15954)
+    assert df.loc[df["hotkey"] == "hk2", "total_volume_usd"].iloc[0] == pytest.approx(
+        14.15954
+    )
     assert df.loc[df["hotkey"] == "hk2", "trade_count"].iloc[0] == 3
 
 
@@ -52,8 +54,12 @@ def test_records_to_dataframe_fill_missing():
 
 def test_records_to_dataframe_drop_duplicates():
     records = [
-        ValidationRecord(hotkey="hk1", performance=PerformanceMetrics(total_volume_usd=1)),
-        ValidationRecord(hotkey="hk1", performance=PerformanceMetrics(total_volume_usd=5)),
+        ValidationRecord(
+            hotkey="hk1", performance=PerformanceMetrics(total_volume_usd=1)
+        ),
+        ValidationRecord(
+            hotkey="hk1", performance=PerformanceMetrics(total_volume_usd=5)
+        ),
     ]
     df = records_to_dataframe(records)
     assert len(df) == 1

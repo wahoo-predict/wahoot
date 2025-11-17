@@ -9,7 +9,9 @@ def make_records():
     return [
         ValidationRecord(
             hotkey="hk1",
-            performance=PerformanceMetrics(total_volume_usd=100, realized_profit_usd=10),
+            performance=PerformanceMetrics(
+                total_volume_usd=100, realized_profit_usd=10
+            ),
         ),
         ValidationRecord(
             hotkey="hk2",

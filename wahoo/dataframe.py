@@ -16,14 +16,23 @@ FLOAT_COLUMNS = [
 ]
 
 INT_COLUMNS = ["trade_count", "open_positions_count", "referral_count"]
-TEXT_COLUMNS = ["hotkey", "signature", "message", "wahoo_user_id", "last_active_timestamp"]
+TEXT_COLUMNS = [
+    "hotkey",
+    "signature",
+    "message",
+    "wahoo_user_id",
+    "last_active_timestamp",
+]
 
 ALL_COLUMNS = TEXT_COLUMNS + INT_COLUMNS + FLOAT_COLUMNS
 
 
 def _performance_dict(perf: PerformanceMetrics) -> Dict[str, object]:
     data = perf.model_dump(by_alias=True)
-    return {key: data.get(key) for key in FLOAT_COLUMNS + INT_COLUMNS + ["last_active_timestamp"]}
+    return {
+        key: data.get(key)
+        for key in FLOAT_COLUMNS + INT_COLUMNS + ["last_active_timestamp"]
+    }
 
 
 def flatten_record(record: ValidationRecord) -> Dict[str, object]:
@@ -76,11 +85,18 @@ def records_to_dataframe(
     return df.reset_index(drop=True)
 
 
-def ensure_required_columns(df: pd.DataFrame, required: Iterable[str] | None = None) -> None:
+def ensure_required_columns(
+    df: pd.DataFrame, required: Iterable[str] | None = None
+) -> None:
     columns = set(df.columns)
     required = set(
         required
-        or ["hotkey", "total_volume_usd", "realized_profit_usd", "unrealized_profit_usd"]
+        or [
+            "hotkey",
+            "total_volume_usd",
+            "realized_profit_usd",
+            "unrealized_profit_usd",
+        ]
     )
     missing = required - columns
     if missing:

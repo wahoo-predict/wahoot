@@ -8,7 +8,9 @@ class PerformanceMetrics(BaseModel):
 
     total_volume_usd: Optional[float] = Field(default=None, alias="total_volume_usd")
     trade_count: Optional[int] = Field(default=None, alias="trade_count")
-    realized_profit_usd: Optional[float] = Field(default=None, alias="realized_profit_usd")
+    realized_profit_usd: Optional[float] = Field(
+        default=None, alias="realized_profit_usd"
+    )
     unrealized_profit_usd: Optional[float] = Field(
         default=None, alias="unrealized_profit_usd"
     )
