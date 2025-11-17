@@ -1,8 +1,8 @@
 import numpy as np
 
-from wahoo.models import ValidationRecord, PerformanceMetrics
-from wahoo.operators import VolumeProfitOperator
-from wahoo.pipeline import OperatorPipeline
+from wahoo import ValidationRecord, PerformanceMetrics
+from wahoo import VolumeProfitOperator
+from wahoo import OperatorPipeline
 
 
 def make_records():

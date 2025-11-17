@@ -3,8 +3,8 @@ from typing import List
 import httpx
 import pytest
 
-from wahoo.client import ValidationAPIClient, ValidationAPIError
-from wahoo.models import PerformanceMetrics, ValidationRecord
+from wahoo import ValidationAPIClient, ValidationAPIError
+from wahoo import PerformanceMetrics, ValidationRecord
 
 
 def build_mock_client(responses: List[httpx.Response]) -> ValidationAPIClient:
