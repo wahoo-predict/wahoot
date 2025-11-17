@@ -237,6 +237,7 @@ Validators use `neurons/scoring.py` to compute weights from WAHOO API data:
 |----------|-------------|---------|
 | `API_BASE_URL` | Scoring API base URL | `http://localhost:8000` |
 | `WAHOO_API_URL` | WAHOO API base URL | `https://api.wahoopredict.com` |
+| `WAHOO_VALIDATION_ENDPOINT` | Full validation endpoint used by validators (overrides default statistics URL) | `https://api.wahoopredict.com/api/v2/event/bittensor/statistics` |
 | `USE_VALIDATOR_DB` | Enable SQLite backup | `false` |
 | `VALIDATOR_DB_PATH` | Custom database path | `~/.wahoo/validator.db` |
 
