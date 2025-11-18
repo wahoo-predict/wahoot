@@ -188,3 +188,129 @@ class ValidationAPIClient:
         raise ValidationAPIError(
             f"Validation API request failed with status {response.status_code}"
         )
+
+
+# Type hint for ValidatorDB interface (to be implemented)
+# This allows us to design the interface without requiring the full implementation
+class ValidatorDBInterface:
+    """Interface for ValidatorDB caching operations.
+
+    This is a type hint/interface definition. The actual ValidatorDB class
+    will implement these methods when it's created.
+    """
+
+    def cache_validation_data(
+        self, hotkey: str, data_dict: Dict[str, Any]
+    ) -> None:
+        """Store validation data for a hotkey in the cache."""
+        raise NotImplementedError
+
+    def get_cached_validation_data(
+        self, hotkeys: Sequence[str], max_age_days: int = 7
+    ) -> List[Dict[str, Any]]:
+        """Retrieve cached validation data for hotkeys."""
+        raise NotImplementedError
+
+
+def get_wahoo_validation_data(
+    hotkeys: Sequence[str],
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    *,
+    max_per_batch: int = 256,
+    batch_timeout: float = 30.0,
+    api_base_url: Optional[str] = None,
+    validator_db: Optional[ValidatorDBInterface] = None,
+    client: Optional[ValidationAPIClient] = None,
+) -> List[ValidationRecord]:
+    """
+    Fetch validation data from WAHOO API with batching support.
+
+    Implements Issue #13: Splits hotkeys into batches of max_per_batch,
+    processes them sequentially, and stores results to ValidatorDB as they complete.
+    Failed batches are skipped without blocking others.
+
+    Args:
+        hotkeys: Sequence of hotkey strings to query
+        start_date: Optional start date in ISO-8601 format
+        end_date: Optional end date in ISO-8601 format
+        max_per_batch: Maximum number of hotkeys per batch (default 256)
+        batch_timeout: Timeout per batch in seconds (default 30.0)
+        api_base_url: Optional base URL (defaults to DEFAULT_VALIDATION_ENDPOINT)
+        validator_db: Optional ValidatorDB instance for caching
+        client: Optional ValidationAPIClient instance
+
+    Returns:
+        List of ValidationRecord objects from all successful batches
+    """
+    if not hotkeys:
+        return []
+
+    # Normalize and deduplicate hotkeys
+    valid_hotkeys = list(dict.fromkeys(str(hk).strip() for hk in hotkeys if hk))
+    if not valid_hotkeys:
+        return []
+
+    # Determine endpoint and create client
+    endpoint = api_base_url.rstrip("/") if api_base_url else os.getenv(
+        "WAHOO_VALIDATION_ENDPOINT", DEFAULT_VALIDATION_ENDPOINT
+    )
+
+    if client is None:
+        client = ValidationAPIClient(base_url=endpoint, timeout=batch_timeout)
+    else:
+        client.base_url = endpoint
+
+    # Split into batches
+    batches = [
+        valid_hotkeys[i : i + max_per_batch]
+        for i in range(0, len(valid_hotkeys), max_per_batch)
+    ]
+
+    bt.logging.info(
+        f"Processing {len(valid_hotkeys)} hotkeys in {len(batches)} batches "
+        f"(max {max_per_batch} per batch)"
+    )
+
+    # Process batches sequentially
+    all_records: List[ValidationRecord] = []
+    successful_batches = 0
+    failed_batches = 0
+
+    for batch_num, batch in enumerate(batches, 1):
+        try:
+            # Fetch data for this batch
+            records = client.fetch_validation_data(
+                hotkeys=batch,
+                start_date=start_date,
+                end_date=end_date,
+            )
+
+            # Store to ValidatorDB if enabled
+            if validator_db is not None:
+                try:
+                    for record in records:
+                        validator_db.cache_validation_data(
+                            hotkey=record.hotkey,
+                            data_dict=record.model_dump(),
+                        )
+                except Exception as e:
+                    bt.logging.warning(f"Failed to cache batch {batch_num}: {e}")
+
+            all_records.extend(records)
+            successful_batches += 1
+            bt.logging.debug(f"Batch {batch_num}/{len(batches)}: {len(records)} records")
+
+        except ValidationAPIError as e:
+            bt.logging.warning(f"Batch {batch_num}/{len(batches)} failed: {e}")
+            failed_batches += 1
+        except Exception as e:
+            bt.logging.error(f"Batch {batch_num}/{len(batches)} error: {e}")
+            failed_batches += 1
+
+    bt.logging.info(
+        f"Batching complete: {successful_batches} successful, "
+        f"{failed_batches} failed, {len(all_records)} total records"
+    )
+
+    return all_records
