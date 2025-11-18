@@ -173,8 +173,7 @@ def reward(
         # Sanity check: if UID has no hotkey or malformed hotkey, set reward to 0 and log
         if hotkey is None or not is_valid_hotkey(hotkey):
             logger.warning(
-                f"UID {uid} has no hotkey or malformed hotkey. "
-                "Setting reward to 0.0"
+                f"UID {uid} has no hotkey or malformed hotkey. " "Setting reward to 0.0"
             )
             rewards_dict[uid] = 0.0
             continue

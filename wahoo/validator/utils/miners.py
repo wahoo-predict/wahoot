@@ -53,7 +53,9 @@ def get_active_uids(metagraph: Any) -> List[int]:
                 logger.debug(f"Error checking UID {uid} axon: {e}")
                 continue
 
-        logger.info(f"Found {len(active_uids)} active UIDs out of {len(metagraph.axons)} total")
+        logger.info(
+            f"Found {len(active_uids)} active UIDs out of {len(metagraph.axons)} total"
+        )
         return active_uids
 
     except Exception as e:
