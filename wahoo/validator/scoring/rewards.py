@@ -90,7 +90,7 @@ def _get_hotkey_from_uid(
         hotkey = uid_to_hotkey[uid]
         if is_valid_hotkey(hotkey):
             return hotkey
-    
+
     # Fallback to metagraph
     try:
         if hasattr(metagraph, "hotkeys") and uid < len(metagraph.hotkeys):
@@ -99,7 +99,7 @@ def _get_hotkey_from_uid(
                 return str(hotkey).strip()
     except (IndexError, AttributeError, TypeError):
         pass
-    
+
     return None
 
 
