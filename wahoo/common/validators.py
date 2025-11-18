@@ -18,11 +18,16 @@ def validate_validation_record(record: Dict[str, Any]) -> bool:
     Validate a single validation data record structure and types.
 
     Enforces required keys and correct types:
-    - hotkey: str (required, non-null)
-    - total_volume_usd: float (required, numeric)
-    - realized_profit_usd: float (required, numeric)
-    - win_rate: float (required, numeric, 0.0-1.0)
-    - Optional fields with type checks
+    - hotkey: str (required, non-null) at top level
+    - performance: dict (required) containing performance metrics
+      - total_volume_usd: numeric (required, can be string or number)
+      - realized_profit_usd: numeric (required, can be string or number)
+      - win_rate: numeric (optional, 0.0-1.0, can be string or number)
+      - Other optional performance fields
+    - Optional top-level fields: signature, message, wahoo_user_id
+
+    Supports both nested structure (performance object) and flat structure
+    for backward compatibility.
 
     Args:
         record: Dictionary containing validation data for a single hotkey
@@ -34,61 +39,112 @@ def validate_validation_record(record: Dict[str, Any]) -> bool:
         logger.debug("Record is not a dictionary")
         return False
 
-    # Required fields
-    required_fields = {
-        "hotkey": str,
-        "total_volume_usd": (int, float),
-        "realized_profit_usd": (int, float),
-        "win_rate": (int, float),
-    }
+    # Check required top-level field: hotkey
+    if "hotkey" not in record:
+        logger.debug("Missing required field: hotkey")
+        return False
 
-    # Check required fields exist and have correct types
-    for field_name, field_type in required_fields.items():
-        if field_name not in record:
+    hotkey = record["hotkey"]
+    if not isinstance(hotkey, str) or len(hotkey.strip()) == 0:
+        logger.debug("hotkey is empty or not a string")
+        return False
+
+    # Check if record uses nested structure (performance object) or flat structure
+    has_performance = "performance" in record and isinstance(record["performance"], dict)
+    performance = record.get("performance", {})
+
+    # Performance metrics that can be in nested 'performance' object or at top level
+    # Required numeric fields (can be string or number)
+    required_numeric_fields = ["total_volume_usd", "realized_profit_usd"]
+
+    # Check required fields - look in performance object first, then top level
+    for field_name in required_numeric_fields:
+        if has_performance:
+            value = performance.get(field_name)
+        else:
+            value = record.get(field_name)
+
+        if value is None:
             logger.debug(f"Missing required field: {field_name}")
             return False
 
-        value = record[field_name]
-
-        # Check type
-        if not isinstance(value, field_type):
+        # Try to convert to float (handles both string and numeric types)
+        try:
+            float_value = float(value)
+            # Check it's a valid number (not NaN or Inf)
+            if not (float_value == float_value):  # NaN check
+                logger.debug(f"Field {field_name} is NaN")
+                return False
+        except (ValueError, TypeError):
             logger.debug(
-                f"Field {field_name} has wrong type: {type(value)}, expected {field_type}"
+                f"Field {field_name} cannot be converted to float: {value} (type: {type(value)})"
             )
             return False
 
-        # Special validation for hotkey
-        if field_name == "hotkey":
-            if not isinstance(value, str) or len(value.strip()) == 0:
-                logger.debug("hotkey is empty or not a string")
-                return False
+    # Optional numeric fields in performance object
+    optional_numeric_fields = {
+        "unrealized_profit_usd": (int, float, str),
+        "win_rate": (int, float, str),
+        "total_fees_paid_usd": (int, float, str),
+        "referral_volume_usd": (int, float, str),
+    }
 
-        # Special validation for win_rate (should be 0.0-1.0)
-        if field_name == "win_rate":
-            try:
-                win_rate = float(value)
-                if not (0.0 <= win_rate <= 1.0):
-                    logger.debug(f"win_rate out of range: {win_rate}")
+    for field_name, field_types in optional_numeric_fields.items():
+        if has_performance:
+            value = performance.get(field_name)
+        else:
+            value = record.get(field_name)
+
+        if value is None:
+            continue
+
+        # Try to convert to float for numeric validation
+        try:
+            float_value = float(value)
+            # Special validation for win_rate (should be 0.0-1.0)
+            if field_name == "win_rate":
+                if not (0.0 <= float_value <= 1.0):
+                    logger.debug(f"win_rate out of range: {float_value}")
                     return False
-            except (ValueError, TypeError):
-                logger.debug(f"win_rate cannot be converted to float: {value}")
-                return False
+        except (ValueError, TypeError):
+            logger.debug(
+                f"Optional numeric field {field_name} cannot be converted to float: {value}"
+            )
+            return False
 
-    # Optional fields with type validation (if present)
-    optional_fields = {
-        "unrealized_profit_usd": (int, float),
+    # Optional integer fields in performance object
+    optional_int_fields = {
         "trade_count": int,
         "open_positions_count": int,
-        "total_fees_paid_usd": (int, float),
         "referral_count": int,
-        "referral_volume_usd": (int, float),
+    }
+
+    for field_name, field_type in optional_int_fields.items():
+        if has_performance:
+            value = performance.get(field_name)
+        else:
+            value = record.get(field_name)
+
+        if value is None:
+            continue
+
+        # Allow string or int (API may return strings)
+        try:
+            int(value)  # Just validate it can be converted
+        except (ValueError, TypeError):
+            logger.debug(
+                f"Optional integer field {field_name} cannot be converted to int: {value}"
+            )
+            return False
+
+    # Optional string fields at top level
+    optional_string_fields = {
         "signature": str,
         "message": str,
-        "last_active_timestamp": str,
         "wahoo_user_id": str,
     }
 
-    for field_name, field_type in optional_fields.items():
+    for field_name, field_type in optional_string_fields.items():
         if field_name in record:
             value = record[field_name]
             # Allow None for optional fields
@@ -102,6 +158,20 @@ def validate_validation_record(record: Dict[str, Any]) -> bool:
                     f"{type(value)}, expected {field_type}"
                 )
                 return False
+
+    # Check last_active_timestamp (can be in performance object or top level)
+    last_active_timestamp = None
+    if has_performance:
+        last_active_timestamp = performance.get("last_active_timestamp")
+    if last_active_timestamp is None:
+        last_active_timestamp = record.get("last_active_timestamp")
+
+    if last_active_timestamp is not None and not isinstance(last_active_timestamp, str):
+        logger.debug(
+            f"Optional field last_active_timestamp has wrong type: "
+            f"{type(last_active_timestamp)}, expected str"
+        )
+        return False
 
     return True
 
@@ -216,4 +286,3 @@ def validate_events_response(data: Any) -> Optional[str]:
 
     logger.debug("No valid active event_id found in events response")
     return None
-
