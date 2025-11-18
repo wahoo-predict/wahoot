@@ -15,4 +15,3 @@ __all__ = [
     "get_wahoo_validation_data",
     "DEFAULT_VALIDATION_ENDPOINT",
 ]
-
