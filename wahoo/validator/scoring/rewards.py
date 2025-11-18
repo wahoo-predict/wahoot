@@ -14,15 +14,10 @@ the weights from all validators.
 """
 
 import torch
-import logging
 from typing import Dict, List, Optional, Any
 
-from wahoo.validator.utils.miners import get_hotkey_for_uid, is_valid_hotkey
-
-logger = logging.getLogger(__name__)
-
 # Note: Weights are calculated locally by each validator, not fetched from API.
-# The wahoo_client.py module is for fetching DATA from WAHOO Predict API
+# The ValidationAPIClient (wahoo/client.py) is for fetching DATA from WAHOO Predict API
 # (trading statistics, validation data), not for fetching weights.
 
 
@@ -67,13 +62,32 @@ def _validate_response(response: Any) -> bool:
         return False
 
 
+def _get_hotkey_from_uid(uid: int, metagraph: Any) -> Optional[str]:
+    """
+    Extract hotkey string from UID using metagraph.
+
+    Args:
+        uid: Miner UID
+        metagraph: Bittensor metagraph object
+
+    Returns:
+        Optional[str]: Hotkey string if found, None otherwise
+    """
+    try:
+        # Standard Bittensor metagraph access pattern
+        if hasattr(metagraph, "hotkeys") and uid < len(metagraph.hotkeys):
+            return metagraph.hotkeys[uid]
+        return None
+    except (IndexError, AttributeError, TypeError):
+        return None
+
+
 def reward(
     responses: List[Any],
     uids: List[int],
     metagraph: Any,
     wahoo_weights: Optional[Dict[str, float]] = None,
-    wahoo_validation_data: Optional[List[Dict[str, Any]]] = None,
-    uid_to_hotkey: Optional[Dict[int, str]] = None,
+    wahoo_validation_data: Optional[List[Any]] = None,
 ) -> torch.FloatTensor:
     """
     Compute rewards for miners using a strict priority system.
@@ -97,9 +111,8 @@ def reward(
         uids: List of miner UIDs corresponding to responses
         metagraph: Bittensor metagraph object for hotkey lookup
         wahoo_weights: Optional dict mapping hotkey to weight from local scoring
-        wahoo_validation_data: Optional validation data (for future use)
-        uid_to_hotkey: Optional pre-built mapping of UID to hotkey. If not provided,
-                      will be built from metagraph. Recommended to build once and reuse.
+                      (typically from OperatorPipeline)
+        wahoo_validation_data: Optional validation data (ValidationRecord objects from API)
 
     Returns:
         torch.FloatTensor: Normalized reward tensor with shape (len(uids),)
@@ -110,18 +123,7 @@ def reward(
 
     if len(responses) != len(uids):
         # Mismatch in responses and UIDs - return zeros
-        logger.warning(
-            f"Mismatch: {len(responses)} responses for {len(uids)} UIDs. "
-            "Returning zero rewards."
-        )
         return torch.zeros(len(uids), dtype=torch.float32)
-
-    # Build uid_to_hotkey mapping if not provided
-    if uid_to_hotkey is None:
-        logger.debug("Building uid_to_hotkey mapping from metagraph")
-        from wahoo.validator.utils.miners import build_uid_to_hotkey
-
-        uid_to_hotkey = build_uid_to_hotkey(metagraph, active_uids=uids)
 
     # Initialize rewards dictionary
     rewards_dict: Dict[int, float] = {}
@@ -133,16 +135,10 @@ def reward(
     # Process each UID independently (per-UID priority)
     for idx, uid in enumerate(uids):
         response = responses[idx] if idx < len(responses) else None
+        hotkey = _get_hotkey_from_uid(uid, metagraph)
 
-        # Get hotkey using uid_to_hotkey mapping (with fallback to metagraph)
-        hotkey = get_hotkey_for_uid(uid, uid_to_hotkey, metagraph)
-
-        # Sanity check: if UID has no hotkey or malformed hotkey, set reward to 0
-        if not hotkey or not is_valid_hotkey(hotkey):
-            logger.warning(
-                f"UID {uid} has no hotkey or malformed hotkey. "
-                "Setting reward to 0.0"
-            )
+        if hotkey is None:
+            # Can't map UID to hotkey - assign zero weight
             rewards_dict[uid] = 0.0
             continue
 
@@ -178,4 +174,3 @@ def reward(
         rewards = torch.zeros(len(uids), dtype=torch.float32)
 
     return rewards
-
