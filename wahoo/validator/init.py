@@ -24,23 +24,24 @@ def check_virtual_env() -> Optional[Path]:
 
 def check_dependencies() -> bool:
     """Check if required dependencies are installed."""
-    required_packages = [
-        "bittensor",
-        "httpx",
-        "torch",
-        "sqlalchemy",
-        "alembic",
-        "python-dotenv",
-        "pandas",
-        "numpy",
-    ]
-
+    # Map package names (pip install name) to import names (Python module name)
+    required_packages = {
+        "bittensor": "bittensor",
+        "httpx": "httpx",
+        "torch": "torch",
+        "sqlalchemy": "sqlalchemy",
+        "alembic": "alembic",
+        "python-dotenv": "dotenv",  # Package name vs import name
+        "pandas": "pandas",
+        "numpy": "numpy",
+    }
+    # Try to import packages and if not found, return as list to import.
     missing = []
-    for package in required_packages:
+    for package_name, import_name in required_packages.items():
         try:
-            __import__(package)
+            __import__(import_name)
         except ImportError:
-            missing.append(package)
+            missing.append(package_name)
 
     if not missing:
         return True
@@ -67,7 +68,7 @@ def install_dependencies(venv_path: Optional[Path] = None) -> bool:
     # Check if uv is available (preferred)
     use_uv = check_uv_available()
 
-    project_root = Path(__file__).parent.parent.parent.parent
+    project_root = Path(__file__).parent.parent.parent
     pyproject_file = project_root / "pyproject.toml"
     requirements_file = project_root / "requirements.txt"
 
@@ -88,7 +89,6 @@ def install_dependencies(venv_path: Optional[Path] = None) -> bool:
 
             # Use pyproject.toml if available, otherwise requirements.txt
             if pyproject_file.exists():
-                # Install package in editable mode from pyproject.toml
                 cmd.extend(["-e", "."])
             elif requirements_file.exists():
                 cmd.extend(["-r", str(requirements_file)])
@@ -98,7 +98,10 @@ def install_dependencies(venv_path: Optional[Path] = None) -> bool:
 
             print(f"Running: {' '.join(cmd)}")
             result = subprocess.run(cmd, check=True, capture_output=True, text=True)
-            print(result.stdout)
+            if result.stdout:
+                print(result.stdout)
+            if result.stderr:
+                print(result.stderr)
             return True
         except subprocess.CalledProcessError as e:
             print("ERROR: Failed to install dependencies with uv:")
@@ -204,7 +207,7 @@ def get_db_path() -> Path:
     db_path = os.getenv("VALIDATOR_DB_PATH", "validator.db")
     if not os.path.isabs(db_path):
         # Default to project root
-        project_root = Path(__file__).parent.parent.parent.parent
+        project_root = Path(__file__).parent.parent.parent
         db_path = project_root / db_path
     return Path(db_path)
 
@@ -350,7 +353,7 @@ def load_config() -> dict:
 
     # Load .env file if dotenv is available
     if load_dotenv:
-        project_root = Path(__file__).parent.parent.parent.parent
+        project_root = Path(__file__).parent.parent.parent
         env_file = project_root / ".env"
         if env_file.exists():
             load_dotenv(env_file)
