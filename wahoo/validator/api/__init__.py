@@ -5,6 +5,7 @@ from .client import (
     ValidationAPIError,
     ValidationAPIClient,
     ValidatorDBInterface,
+    get_active_event_id,
     get_wahoo_validation_data,
 )
 
@@ -13,5 +14,6 @@ __all__ = [
     "ValidationAPIError",
     "ValidatorDBInterface",
     "get_wahoo_validation_data",
+    "get_active_event_id",
     "DEFAULT_VALIDATION_ENDPOINT",
 ]
