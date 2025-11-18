@@ -13,8 +13,13 @@ Multiple validators run independently, and Bittensor's consensus mechanism aggre
 the weights from all validators.
 """
 
+import logging
 import torch
 from typing import Dict, List, Optional, Any
+
+from wahoo.validator.utils.miners import build_uid_to_hotkey, is_valid_hotkey
+
+logger = logging.getLogger(__name__)
 
 # Note: Weights are calculated locally by each validator, not fetched from API.
 # The ValidationAPIClient (wahoo/client.py) is for fetching DATA from WAHOO Predict API
@@ -62,24 +67,40 @@ def _validate_response(response: Any) -> bool:
         return False
 
 
-def _get_hotkey_from_uid(uid: int, metagraph: Any) -> Optional[str]:
+def _get_hotkey_from_uid(
+    uid: int, metagraph: Any, uid_to_hotkey: Optional[Dict[int, str]] = None
+) -> Optional[str]:
     """
-    Extract hotkey string from UID using metagraph.
+    Extract hotkey string from UID using uid_to_hotkey mapping or metagraph.
+
+    Priority:
+    1. Use uid_to_hotkey mapping if provided (preferred)
+    2. Fallback to metagraph.hotkeys[uid]
 
     Args:
         uid: Miner UID
         metagraph: Bittensor metagraph object
+        uid_to_hotkey: Optional pre-built UID-to-hotkey mapping
 
     Returns:
-        Optional[str]: Hotkey string if found, None otherwise
+        Optional[str]: Hotkey string if found and valid, None otherwise
     """
+    # Try uid_to_hotkey mapping first (preferred)
+    if uid_to_hotkey is not None and uid in uid_to_hotkey:
+        hotkey = uid_to_hotkey[uid]
+        if is_valid_hotkey(hotkey):
+            return hotkey
+    
+    # Fallback to metagraph
     try:
-        # Standard Bittensor metagraph access pattern
         if hasattr(metagraph, "hotkeys") and uid < len(metagraph.hotkeys):
-            return metagraph.hotkeys[uid]
-        return None
+            hotkey = metagraph.hotkeys[uid]
+            if is_valid_hotkey(hotkey):
+                return str(hotkey).strip()
     except (IndexError, AttributeError, TypeError):
-        return None
+        pass
+    
+    return None
 
 
 def reward(
@@ -88,6 +109,7 @@ def reward(
     metagraph: Any,
     wahoo_weights: Optional[Dict[str, float]] = None,
     wahoo_validation_data: Optional[List[Any]] = None,
+    uid_to_hotkey: Optional[Dict[int, str]] = None,
 ) -> torch.FloatTensor:
     """
     Compute rewards for miners using a strict priority system.
@@ -113,6 +135,8 @@ def reward(
         wahoo_weights: Optional dict mapping hotkey to weight from local scoring
                       (typically from OperatorPipeline)
         wahoo_validation_data: Optional validation data (ValidationRecord objects from API)
+        uid_to_hotkey: Optional pre-built mapping of UID to hotkey. If not provided,
+                      will be built from metagraph. Recommended to build once and reuse.
 
     Returns:
         torch.FloatTensor: Normalized reward tensor with shape (len(uids),)
@@ -123,7 +147,16 @@ def reward(
 
     if len(responses) != len(uids):
         # Mismatch in responses and UIDs - return zeros
+        logger.warning(
+            f"Mismatch: {len(responses)} responses for {len(uids)} UIDs. "
+            "Returning zero rewards."
+        )
         return torch.zeros(len(uids), dtype=torch.float32)
+
+    # Build uid_to_hotkey mapping if not provided
+    if uid_to_hotkey is None:
+        logger.debug("Building uid_to_hotkey mapping from metagraph")
+        uid_to_hotkey = build_uid_to_hotkey(metagraph, active_uids=uids)
 
     # Initialize rewards dictionary
     rewards_dict: Dict[int, float] = {}
@@ -135,10 +168,14 @@ def reward(
     # Process each UID independently (per-UID priority)
     for idx, uid in enumerate(uids):
         response = responses[idx] if idx < len(responses) else None
-        hotkey = _get_hotkey_from_uid(uid, metagraph)
+        hotkey = _get_hotkey_from_uid(uid, metagraph, uid_to_hotkey)
 
-        if hotkey is None:
-            # Can't map UID to hotkey - assign zero weight
+        # Sanity check: if UID has no hotkey or malformed hotkey, set reward to 0 and log
+        if hotkey is None or not is_valid_hotkey(hotkey):
+            logger.warning(
+                f"UID {uid} has no hotkey or malformed hotkey. "
+                "Setting reward to 0.0"
+            )
             rewards_dict[uid] = 0.0
             continue
 
