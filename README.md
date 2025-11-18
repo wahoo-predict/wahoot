@@ -147,6 +147,157 @@ We keep the scoring simple and transparent. Every miner gets evaluated on three 
 | `USE_VALIDATOR_DB` | Enable SQLite backup | `false` |
 | `VALIDATOR_DB_PATH` | Custom database path | `~/.wahoo/validator.db` |
 
+### Validator Setup & Installation
+
+Ready to run a validator? Here's everything you need to get started.
+
+#### Prerequisites
+
+- **Python 3.10+** (3.11 or 3.12 recommended)
+- **Unix/Linux system** (macOS or Linux)
+- **SQLite 3** (usually pre-installed)
+- **Virtual environment** (recommended: `venv`, `virtualenv`, or `uv`)
+
+#### Installation Options
+
+**Option 1: Using `uv` (Recommended - Fastest)**
+
+```bash
+# Install uv if you haven't already
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Clone the repository
+git clone <repository-url>
+cd wahoonet
+
+# Create virtual environment and install
+uv venv
+source .venv/bin/activate  # On macOS/Linux
+uv pip install -e ".[dev]"  # Install with dev dependencies
+```
+
+**Option 2: Using `pip` (Traditional)**
+
+```bash
+# Clone the repository
+git clone <repository-url>
+cd wahoonet
+
+# Create virtual environment
+python3 -m venv venv
+source venv/bin/activate  # On macOS/Linux
+
+# Install the package
+pip install -e ".[dev]"  # Install with dev dependencies
+```
+
+#### Environment Configuration
+
+1. **Create a `.env` file** in the project root (optional):
+
+```bash
+# Database path (optional, defaults to validator.db in project root)
+VALIDATOR_DB_PATH=/path/to/your/validator.db
+
+# Add other environment variables as needed
+```
+
+2. **Set up your Bittensor wallet** (if not already done):
+
+```bash
+btcli wallet new_coldkey
+btcli wallet new_hotkey --wallet.name <your_wallet>
+```
+
+#### Initialization
+
+Before running the validator, you need to initialize the environment and database:
+
+```bash
+# Run the initialization script
+wahoo-validator-init
+
+# Or run it directly with Python
+python -m wahoo.validator.init
+```
+
+The initialization script will:
+- ✅ Check and install missing dependencies (automatically uses `uv` if available, falls back to `pip`)
+- ✅ Verify SQLite is available
+- ✅ Create and initialize the database if it doesn't exist
+- ✅ Run Alembic migrations to ensure database schema is up to date
+- ✅ Load configuration from `.env` file
+
+**Initialization Options:**
+
+```bash
+# Skip dependency checking (if you've already installed everything)
+wahoo-validator-init --skip-deps
+
+# Skip database initialization (if database already exists)
+wahoo-validator-init --skip-db
+
+# Specify custom database path
+wahoo-validator-init --db-path /custom/path/to/database.db
+```
+
+#### Starting the Validator
+
+Once initialization is complete, you can start the validator:
+
+```bash
+# Activate your virtual environment (if not already active)
+source venv/bin/activate  # or: source .venv/bin/activate for uv
+
+# Run the validator
+python -m wahoo.validator.validator
+# Or use your preferred method to run the validator script
+```
+
+**Note:** Make sure you've registered your validator on the subnet first:
+
+```bash
+btcli wallet register --netuid <netuid>
+```
+
+#### Troubleshooting
+
+**Issue: Dependencies fail to install**
+
+- Make sure you're in a virtual environment
+- Try running with elevated privileges: `sudo wahoo-validator-init`
+- Or manually install: `pip install -r requirements.txt` or `uv pip install -e .`
+
+**Issue: Database errors**
+
+- Check that SQLite is installed: `sqlite3 --version`
+- Verify database path permissions
+- Try deleting the database file and re-running initialization
+
+**Issue: Import errors**
+
+- Ensure the package is installed in editable mode: `pip install -e .` or `uv pip install -e .`
+- Verify your virtual environment is activated
+- Check that all dependencies are installed: `pip list` or `uv pip list`
+
+**Issue: Alembic migration errors**
+
+- Ensure you're running from the project root directory
+- Check that `wahoo/validator/database/alembic.ini` exists
+- Try manually running: `cd wahoo/validator/database && alembic upgrade head`
+
+#### Development Setup
+
+For development work, install with dev dependencies:
+
+```bash
+# With uv
+uv pip install -e ".[dev]"
+
+# With pip
+pip install -e ".[dev]"
+```
+
 ---
 
 ## 📚 Need More Info? We've Got You Covered
