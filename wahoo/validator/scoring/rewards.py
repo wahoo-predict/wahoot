@@ -127,9 +127,10 @@ def _validate_response(response: Any) -> bool:
         # Issue #25: Validate optional fields if present
         # Check event_id if present (should be non-empty string)
         if hasattr(response, "event_id") and response.event_id is not None:
-            if not isinstance(response.event_id, str) or len(
-                response.event_id.strip()
-            ) == 0:
+            if (
+                not isinstance(response.event_id, str)
+                or len(response.event_id.strip()) == 0
+            ):
                 logger.debug(f"event_id is invalid: {response.event_id}")
                 return False
 
@@ -142,9 +143,7 @@ def _validate_response(response: Any) -> bool:
                     return False
                 # Optional: validate confidence is in reasonable range [0.0, 1.0]
                 if not (0.0 <= confidence <= 1.0):
-                    logger.debug(
-                        f"confidence out of range [0.0, 1.0]: {confidence}"
-                    )
+                    logger.debug(f"confidence out of range [0.0, 1.0]: {confidence}")
                     return False
             except (ValueError, TypeError):
                 logger.debug(
@@ -153,7 +152,10 @@ def _validate_response(response: Any) -> bool:
                 return False
 
         # Check protocol_version if present (should be string or int)
-        if hasattr(response, "protocol_version") and response.protocol_version is not None:
+        if (
+            hasattr(response, "protocol_version")
+            and response.protocol_version is not None
+        ):
             if not isinstance(response.protocol_version, (str, int)):
                 logger.debug(
                     f"protocol_version has invalid type: {type(response.protocol_version)}"

@@ -98,8 +98,7 @@ def validate_validation_record(record: Dict[str, Any]) -> bool:
             # Check it's a finite number (not NaN, not Inf)
             if not _is_finite_number(float_value):
                 logger.debug(
-                    f"Field {field_name} is not finite: {float_value} "
-                    f"(NaN or Inf)"
+                    f"Field {field_name} is not finite: {float_value} " f"(NaN or Inf)"
                 )
                 return False
         except (ValueError, TypeError):
