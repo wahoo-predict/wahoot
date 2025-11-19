@@ -99,7 +99,10 @@ def _check_thresholds(record: ValidationRecord) -> tuple[bool, Optional[str]]:
     # Check MIN_WIN_RATE threshold (if win_rate is available)
     win_rate = perf.win_rate
     if win_rate is not None and win_rate < MIN_WIN_RATE:
-        return False, f"win_rate below threshold (win_rate={win_rate}, min={MIN_WIN_RATE})"
+        return (
+            False,
+            f"win_rate below threshold (win_rate={win_rate}, min={MIN_WIN_RATE})",
+        )
 
     return True, None
 
