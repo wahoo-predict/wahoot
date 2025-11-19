@@ -15,6 +15,9 @@ from ..models import ValidationRecord
 
 load_dotenv()
 
+# Import fallback utilities (Issue #16)
+from .fallback import filter_usable_records
+
 DEFAULT_VALIDATION_ENDPOINT = (
     "https://api.wahoopredict.com/api/v2/event/bittensor/statistics"
 )
@@ -299,12 +302,13 @@ def get_wahoo_validation_data(
     """
     Fetch validation data from WAHOO API with batching support.
 
-    Implements Issue #13 (batching) and Issue #17 (timeouts):
+    Implements Issue #13 (batching), Issue #17 (timeouts), and Issue #16 (fallback):
     - Splits hotkeys into batches of max_per_batch (default 256)
     - Sets 30s timeout for each batch httpx.get() call (Issue #17)
-    - Treats validation timeouts as hard failures and triggers cache fallback
+    - Treats validation timeouts as hard failures and triggers cache fallback (Issue #17)
     - Processes batches sequentially
     - Stores results to ValidatorDB as batches complete
+    - Filters out records with empty metrics (Issue #16)
 
     Args:
         hotkeys: Sequence of hotkey strings to query
@@ -317,7 +321,7 @@ def get_wahoo_validation_data(
         client: Optional ValidationAPIClient instance
 
     Returns:
-        List of ValidationRecord objects from all successful batches
+        List of ValidationRecord objects with usable metrics from all successful batches
     """
     if not hotkeys:
         return []
@@ -431,7 +435,16 @@ def get_wahoo_validation_data(
         f"{failed_batches} failed, {len(all_records)} total records"
     )
 
-    return all_records
+    # Filter out records with empty metrics (Issue #16)
+    usable_records = filter_usable_records(all_records)
+    if len(usable_records) < len(all_records):
+        excluded = len(all_records) - len(usable_records)
+        bt.logging.info(
+            f"Filtered {excluded} record(s) with empty metrics. "
+            f"Returning {len(usable_records)} usable records."
+        )
+
+    return usable_records
 
 
 # Note: Dendrite miner queries timeout specification (Issue #17)
@@ -450,3 +463,13 @@ def get_wahoo_validation_data(
 # - set_weights: ~5-10s
 # - Cache cleanup: ~1-2s
 # Total worst-case: ~60-70s (with timeouts), well under 100s budget
+
+# Note: Cache cleanup integration (Issue #16)
+# When ValidatorDB class is implemented, integrate periodic cleanup into main loop:
+#   - Call validator_db.cleanup_old_cache(max_age_days=7) periodically (e.g., every 10 loops)
+#   - Run VACUUM periodically to keep database file size under control (e.g., every 50 loops)
+#   - Example:
+#       if loop_count % 10 == 0:
+#           validator_db.cleanup_old_cache(max_age_days=7)
+#       if loop_count % 50 == 0:
+#           validator_db.vacuum()  # or conn.execute("VACUUM")
