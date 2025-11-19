@@ -29,7 +29,9 @@ logger = logging.getLogger(__name__)
 
 # Configuration flag for Issue #22: Equal weights fallback
 # When all rewards are zero, optionally assign equal weights to all miners with valid responses
-USE_EQUAL_WEIGHTS_FALLBACK = os.getenv("USE_EQUAL_WEIGHTS_FALLBACK", "false").lower() == "true"
+USE_EQUAL_WEIGHTS_FALLBACK = (
+    os.getenv("USE_EQUAL_WEIGHTS_FALLBACK", "false").lower() == "true"
+)
 # Threshold constants for Issue #20
 MIN_VOLUME_USD = 0.0  # Minimum total volume in USD (0.0 = no minimum by default)
 MIN_WIN_RATE = 0.0  # Minimum win rate (0.0-1.0, 0.0 = no minimum by default)
@@ -357,9 +359,9 @@ def reward(
 
     # Issue #22: Enforce invariants after normalization
     # Invariant 1: Shape must match uids length
-    assert rewards.shape == (len(uids),), (
-        f"Rewards shape mismatch: expected ({len(uids)},), got {rewards.shape}"
-    )
+    assert rewards.shape == (
+        len(uids),
+    ), f"Rewards shape mismatch: expected ({len(uids)},), got {rewards.shape}"
 
     # Invariant 2: When total > 0, sum must be approximately 1.0 (within floating point tolerance)
     if total > 0.0:
