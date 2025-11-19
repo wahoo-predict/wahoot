@@ -8,26 +8,47 @@ This module provides validation functions for:
 """
 
 import logging
+import math
 from typing import Dict, List, Optional, Any
 
 logger = logging.getLogger(__name__)
+
+
+def _is_finite_number(value: float) -> bool:
+    """
+    Check if a value is a finite number (not NaN, not Inf).
+
+    Implements Issue #25: Explicit finite/NaN checks for all numeric fields.
+
+    Args:
+        value: Numeric value to check
+
+    Returns:
+        bool: True if value is finite, False otherwise
+    """
+    return math.isfinite(value)
 
 
 def validate_validation_record(record: Dict[str, Any]) -> bool:
     """
     Validate a single validation data record structure and types.
 
+    Implements Issue #25: Enhanced validation with explicit finite/NaN checks
+    for all numeric fields in WAHOO responses.
+
     Enforces required keys and correct types:
     - hotkey: str (required, non-null) at top level
     - performance: dict (required) containing performance metrics
-      - total_volume_usd: numeric (required, can be string or number)
-      - realized_profit_usd: numeric (required, can be string or number)
-      - win_rate: numeric (optional, 0.0-1.0, can be string or number)
-      - Other optional performance fields
+      - total_volume_usd: numeric (required, can be string or number, must be finite)
+      - realized_profit_usd: numeric (required, can be string or number, must be finite)
+      - win_rate: numeric (optional, 0.0-1.0, can be string or number, must be finite)
+      - Other optional performance fields (all must be finite if present)
     - Optional top-level fields: signature, message, wahoo_user_id
 
     Supports both nested structure (performance object) and flat structure
     for backward compatibility.
+
+    All numeric fields are validated to be finite (not NaN, not Inf).
 
     Args:
         record: Dictionary containing validation data for a single hotkey
@@ -73,9 +94,13 @@ def validate_validation_record(record: Dict[str, Any]) -> bool:
         # Try to convert to float (handles both string and numeric types)
         try:
             float_value = float(value)
-            # Check it's a valid number (not NaN or Inf)
-            if not (float_value == float_value):  # NaN check
-                logger.debug(f"Field {field_name} is NaN")
+            # Issue #25: Explicit finite/NaN checks for all numeric fields
+            # Check it's a finite number (not NaN, not Inf)
+            if not _is_finite_number(float_value):
+                logger.debug(
+                    f"Field {field_name} is not finite: {float_value} "
+                    f"(NaN or Inf)"
+                )
                 return False
         except (ValueError, TypeError):
             logger.debug(
@@ -103,6 +128,14 @@ def validate_validation_record(record: Dict[str, Any]) -> bool:
         # Try to convert to float for numeric validation
         try:
             float_value = float(value)
+            # Issue #25: Explicit finite/NaN checks for all numeric fields
+            # Check it's a finite number (not NaN, not Inf)
+            if not _is_finite_number(float_value):
+                logger.debug(
+                    f"Optional field {field_name} is not finite: {float_value} "
+                    f"(NaN or Inf)"
+                )
+                return False
             # Special validation for win_rate (should be 0.0-1.0)
             if field_name == "win_rate":
                 if not (0.0 <= float_value <= 1.0):
