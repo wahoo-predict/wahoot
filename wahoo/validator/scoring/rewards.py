@@ -14,6 +14,7 @@ the weights from all validators.
 """
 
 import logging
+import math
 import os
 import torch
 from typing import Dict, List, Optional, Any
@@ -37,44 +38,131 @@ MIN_VOLUME_USD = 0.0  # Minimum total volume in USD (0.0 = no minimum by default
 MIN_WIN_RATE = 0.0  # Minimum win rate (0.0-1.0, 0.0 = no minimum by default)
 
 
+def _is_finite_number(value: float) -> bool:
+    """
+    Check if a value is a finite number (not NaN, not Inf).
+
+    Implements Issue #25: Explicit finite/NaN checks for all numeric fields.
+
+    Args:
+        value: Numeric value to check
+
+    Returns:
+        bool: True if value is finite, False otherwise
+    """
+    return math.isfinite(value)
+
+
 def _validate_response(response: Any) -> bool:
     """
     Validate a miner's response structure and values.
 
+    Implements Issue #25: Response validation checks with protocol version,
+    required fields, and explicit finite/NaN checks.
+
     Checks:
-    - prob_yes is between 0.0 and 1.0 (inclusive)
-    - prob_yes + prob_no equals 1.0 (within floating point tolerance)
     - Response is not None/empty
+    - Required fields present: prob_yes, prob_no
+    - Optional fields validated if present: event_id, confidence, protocol_version
+    - prob_yes is between 0.0 and 1.0 (inclusive) and is finite
+    - prob_no is finite (can be negative for validation purposes, but must be finite)
+    - prob_yes + prob_no equals 1.0 (within floating point tolerance)
+    - All numeric fields are finite (not NaN, not Inf)
+
+    Timeout Handling:
+    - Responses that time out during dendrite.query() will be None or missing
+    - This function returns False for None/missing responses, marking them invalid
+    - Timeout handling is done at the dendrite.query() level (12s timeout per Issue #17)
+    - Invalid responses (including timeouts) are assigned weight 0.0 in reward()
 
     Args:
-        response: Miner response object (expected to have prob_yes, prob_no attributes)
+        response: Miner response object (synapse with prob_yes, prob_no attributes)
+                 Expected structure: WAHOOPredict synapse with:
+                 - prob_yes: float (required, 0.0-1.0, finite)
+                 - prob_no: float (required, finite)
+                 - event_id: str (optional)
+                 - confidence: float (optional, finite)
+                 - protocol_version: str/int (optional)
 
     Returns:
         bool: True if response is valid, False otherwise
     """
     if response is None:
+        logger.debug("Response is None (likely timeout or missing)")
         return False
 
     # Check if response has required attributes
     if not hasattr(response, "prob_yes") or not hasattr(response, "prob_no"):
+        logger.debug("Response missing required fields: prob_yes or prob_no")
         return False
 
     try:
+        # Convert to float and validate finite
         prob_yes = float(response.prob_yes)
         prob_no = float(response.prob_no)
 
+        # Issue #25: Explicit finite/NaN checks for all numeric fields
+        if not _is_finite_number(prob_yes):
+            logger.debug(f"prob_yes is not finite: {prob_yes}")
+            return False
+
+        if not _is_finite_number(prob_no):
+            logger.debug(f"prob_no is not finite: {prob_no}")
+            return False
+
         # Check prob_yes is in valid range [0.0, 1.0]
         if not (0.0 <= prob_yes <= 1.0):
+            logger.debug(f"prob_yes out of range [0.0, 1.0]: {prob_yes}")
             return False
 
         # Check prob_yes + prob_no equals 1.0 (with tolerance for floating point)
         # Using small epsilon for floating point comparison
         epsilon = 1e-6
         if abs((prob_yes + prob_no) - 1.0) > epsilon:
+            logger.debug(
+                f"prob_yes + prob_no != 1.0: {prob_yes} + {prob_no} = {prob_yes + prob_no}"
+            )
             return False
 
+        # Issue #25: Validate optional fields if present
+        # Check event_id if present (should be non-empty string)
+        if hasattr(response, "event_id") and response.event_id is not None:
+            if not isinstance(response.event_id, str) or len(
+                response.event_id.strip()
+            ) == 0:
+                logger.debug(f"event_id is invalid: {response.event_id}")
+                return False
+
+        # Check confidence if present (should be finite float, typically 0.0-1.0)
+        if hasattr(response, "confidence") and response.confidence is not None:
+            try:
+                confidence = float(response.confidence)
+                if not _is_finite_number(confidence):
+                    logger.debug(f"confidence is not finite: {confidence}")
+                    return False
+                # Optional: validate confidence is in reasonable range [0.0, 1.0]
+                if not (0.0 <= confidence <= 1.0):
+                    logger.debug(
+                        f"confidence out of range [0.0, 1.0]: {confidence}"
+                    )
+                    return False
+            except (ValueError, TypeError):
+                logger.debug(
+                    f"confidence cannot be converted to float: {response.confidence}"
+                )
+                return False
+
+        # Check protocol_version if present (should be string or int)
+        if hasattr(response, "protocol_version") and response.protocol_version is not None:
+            if not isinstance(response.protocol_version, (str, int)):
+                logger.debug(
+                    f"protocol_version has invalid type: {type(response.protocol_version)}"
+                )
+                return False
+
         return True
-    except (ValueError, TypeError, AttributeError):
+    except (ValueError, TypeError, AttributeError) as exc:
+        logger.debug(f"Response validation error: {exc}")
         return False
 
 
