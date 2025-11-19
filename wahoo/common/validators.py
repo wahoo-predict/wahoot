@@ -50,7 +50,9 @@ def validate_validation_record(record: Dict[str, Any]) -> bool:
         return False
 
     # Check if record uses nested structure (performance object) or flat structure
-    has_performance = "performance" in record and isinstance(record["performance"], dict)
+    has_performance = "performance" in record and isinstance(
+        record["performance"], dict
+    )
     performance = record.get("performance", {})
 
     # Performance metrics that can be in nested 'performance' object or at top level
