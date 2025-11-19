@@ -23,7 +23,9 @@ def test_batching_with_mock_data():
     print("=" * 60)
 
     # Create test hotkeys (more than 256 to test batching)
-    hotkeys = [f"5G6HBuhKoYUjGvbcoa6X6Tm3q2jNFek1Ry78S8gKyY5HgiDj_{i}" for i in range(300)]
+    hotkeys = [
+        f"5G6HBuhKoYUjGvbcoa6X6Tm3q2jNFek1Ry78S8gKyY5HgiDj_{i}" for i in range(300)
+    ]
 
     print(f"\nTesting with {len(hotkeys)} hotkeys")
     print(f"Expected batches: {len(hotkeys) // 256 + (1 if len(hotkeys) % 256 else 0)}")
@@ -39,7 +41,9 @@ def test_batching_with_mock_data():
     except Exception as e:
         print(f"\n✗ Error (expected if API not accessible): {e}")
         print("\nNote: This tests the batching logic. For full testing, use pytest:")
-        print("  pytest tests/test_client.py::test_get_wahoo_validation_data_batching_splits_correctly")
+        print(
+            "  pytest tests/test_client.py::test_get_wahoo_validation_data_batching_splits_correctly"
+        )
         return False
 
 

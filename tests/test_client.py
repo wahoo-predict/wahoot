@@ -226,12 +226,15 @@ def test_get_wahoo_validation_data_handles_failed_batches():
             # Extract hotkeys from request
             params = dict(request.url.params)
             batch_hotkeys = params.get("hotkeys", "").split(",")
-            return httpx.Response(200, json={
-                "data": [
-                    {"hotkey": hk, "performance": {"total_volume_usd": "100.0"}}
-                    for hk in batch_hotkeys
-                ]
-            })
+            return httpx.Response(
+                200,
+                json={
+                    "data": [
+                        {"hotkey": hk, "performance": {"total_volume_usd": "100.0"}}
+                        for hk in batch_hotkeys
+                    ]
+                },
+            )
 
     transport = httpx.MockTransport(handler)
     session = httpx.Client(transport=transport)
@@ -274,12 +277,15 @@ def test_get_wahoo_validation_data_with_validator_db():
     def handler(request: httpx.Request) -> httpx.Response:
         params = dict(request.url.params)
         batch_hotkeys = params.get("hotkeys", "").split(",")
-        return httpx.Response(200, json={
-            "data": [
-                {"hotkey": hk, "performance": {"total_volume_usd": "100.0"}}
-                for hk in batch_hotkeys
-            ]
-        })
+        return httpx.Response(
+            200,
+            json={
+                "data": [
+                    {"hotkey": hk, "performance": {"total_volume_usd": "100.0"}}
+                    for hk in batch_hotkeys
+                ]
+            },
+        )
 
     transport = httpx.MockTransport(handler)
     session = httpx.Client(transport=transport)
@@ -312,12 +318,15 @@ def test_get_wahoo_validation_data_deduplicates_hotkeys():
         batch_hotkeys = params.get("hotkeys", "").split(",")
         call_tracker["hotkeys_seen"].update(batch_hotkeys)
 
-        return httpx.Response(200, json={
-            "data": [
-                {"hotkey": hk, "performance": {"total_volume_usd": "100.0"}}
-                for hk in batch_hotkeys
-            ]
-        })
+        return httpx.Response(
+            200,
+            json={
+                "data": [
+                    {"hotkey": hk, "performance": {"total_volume_usd": "100.0"}}
+                    for hk in batch_hotkeys
+                ]
+            },
+        )
 
     transport = httpx.MockTransport(handler)
     session = httpx.Client(transport=transport)

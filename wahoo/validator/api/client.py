@@ -223,9 +223,9 @@ def get_active_event_id(
     if api_base_url:
         base_url = api_base_url.rstrip("/")
     else:
-        base_url = os.getenv(
-            "WAHOO_API_URL", "https://api.wahoopredict.com"
-        ).rstrip("/")
+        base_url = os.getenv("WAHOO_API_URL", "https://api.wahoopredict.com").rstrip(
+            "/"
+        )
 
     events_url = f"{base_url}/events"
 
@@ -377,7 +377,9 @@ def get_wahoo_validation_data(
 
             all_records.extend(records)
             successful_batches += 1
-            bt.logging.debug(f"Batch {batch_num}/{len(batches)}: {len(records)} records")
+            bt.logging.debug(
+                f"Batch {batch_num}/{len(batches)}: {len(records)} records"
+            )
 
         except ValidationAPIError as e:
             # Timeout or other API error - try cache fallback (Issue #17)
