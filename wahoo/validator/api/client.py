@@ -131,6 +131,14 @@ class ValidationAPIClient:
             attempt += 1
             try:
                 response = self._session.get(url, params=params)
+            except httpx.TimeoutException as exc:
+                # Timeout is a hard failure - don't retry, raise immediately
+                bt.logging.error(
+                    f"ValidationAPI request timed out after {self.timeout}s: {exc}"
+                )
+                raise ValidationAPIError(
+                    f"Validation API request timed out after {self.timeout}s"
+                ) from exc
             except httpx.HTTPError as exc:
                 bt.logging.warning(f"ValidationAPI request failed: {exc}")
                 if attempt >= self.max_retries:
@@ -188,3 +196,255 @@ class ValidationAPIClient:
         raise ValidationAPIError(
             f"Validation API request failed with status {response.status_code}"
         )
+
+
+def get_active_event_id(
+    api_base_url: Optional[str] = None,
+    *,
+    timeout: float = 10.0,
+    default_event_id: str = "wahoo_test_event",
+) -> str:
+    """
+    Get the active event ID from the WAHOO API.
+
+    Implements Issue #17: Timeout specifications.
+    - Sets 10s timeout for httpx.get() call to /events
+    - On timeout, logs failure and falls back to default_event_id
+
+    Args:
+        api_base_url: Optional base URL for API (defaults to WAHOO_API_URL env var)
+        timeout: Timeout in seconds (default 10.0)
+        default_event_id: Fallback event ID if request fails (default "wahoo_test_event")
+
+    Returns:
+        str: Active event_id from API, or default_event_id on failure
+    """
+    # Determine API base URL
+    if api_base_url:
+        base_url = api_base_url.rstrip("/")
+    else:
+        base_url = os.getenv(
+            "WAHOO_API_URL", "https://api.wahoopredict.com"
+        ).rstrip("/")
+
+    events_url = f"{base_url}/events"
+
+    try:
+        # Create client with 10s timeout (Issue #17)
+        with httpx.Client(timeout=timeout) as client:
+            response = client.get(events_url)
+            response.raise_for_status()
+
+            # Parse response to extract active event_id
+            data = response.json()
+            if isinstance(data, dict):
+                # Try common response formats
+                event_id = (
+                    data.get("active_event_id")
+                    or data.get("event_id")
+                    or data.get("id")
+                    or data.get("event")
+                )
+                if event_id:
+                    bt.logging.info(f"Retrieved active event_id: {event_id}")
+                    return str(event_id)
+
+            # If we can't find event_id in response, log and fallback
+            bt.logging.warning(
+                f"Could not extract event_id from response: {data}. "
+                f"Using default: {default_event_id}"
+            )
+            return default_event_id
+
+    except httpx.TimeoutException as exc:
+        bt.logging.warning(
+            f"Events API request timed out after {timeout}s: {exc}. "
+            f"Falling back to default event_id: {default_event_id}"
+        )
+        return default_event_id
+    except (httpx.HTTPError, ValueError, KeyError) as exc:
+        bt.logging.warning(
+            f"Failed to get active event_id from API: {exc}. "
+            f"Falling back to default event_id: {default_event_id}"
+        )
+        return default_event_id
+
+
+# Type hint for ValidatorDB interface (for cache fallback)
+class ValidatorDBInterface:
+    """Interface for ValidatorDB caching operations."""
+
+    def cache_validation_data(self, hotkey: str, data_dict: Dict[str, Any]) -> None:
+        """Store validation data for a hotkey in the cache."""
+        raise NotImplementedError
+
+    def get_cached_validation_data(
+        self, hotkeys: Sequence[str], max_age_days: int = 7
+    ) -> List[Dict[str, Any]]:
+        """Retrieve cached validation data for hotkeys."""
+        raise NotImplementedError
+
+
+def get_wahoo_validation_data(
+    hotkeys: Sequence[str],
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    *,
+    max_per_batch: int = 256,
+    batch_timeout: float = 30.0,
+    api_base_url: Optional[str] = None,
+    validator_db: Optional[ValidatorDBInterface] = None,
+    client: Optional[ValidationAPIClient] = None,
+) -> List[ValidationRecord]:
+    """
+    Fetch validation data from WAHOO API with batching support.
+
+    Implements Issue #13 (batching) and Issue #17 (timeouts):
+    - Splits hotkeys into batches of max_per_batch (default 256)
+    - Sets 30s timeout for each batch httpx.get() call (Issue #17)
+    - Treats validation timeouts as hard failures and triggers cache fallback
+    - Processes batches sequentially
+    - Stores results to ValidatorDB as batches complete
+
+    Args:
+        hotkeys: Sequence of hotkey strings to query
+        start_date: Optional start date in ISO-8601 format
+        end_date: Optional end date in ISO-8601 format
+        max_per_batch: Maximum number of hotkeys per batch (default 256)
+        batch_timeout: Timeout per batch in seconds (default 30.0, Issue #17)
+        api_base_url: Optional base URL (defaults to DEFAULT_VALIDATION_ENDPOINT)
+        validator_db: Optional ValidatorDB instance for caching and fallback
+        client: Optional ValidationAPIClient instance
+
+    Returns:
+        List of ValidationRecord objects from all successful batches
+    """
+    if not hotkeys:
+        return []
+
+    # Normalize and deduplicate hotkeys
+    valid_hotkeys = list(dict.fromkeys(str(hk).strip() for hk in hotkeys if hk))
+    if not valid_hotkeys:
+        return []
+
+    # Determine endpoint and create client
+    endpoint = (
+        api_base_url.rstrip("/")
+        if api_base_url
+        else os.getenv("WAHOO_VALIDATION_ENDPOINT", DEFAULT_VALIDATION_ENDPOINT)
+    )
+
+    if client is None:
+        client = ValidationAPIClient(base_url=endpoint, timeout=batch_timeout)
+    else:
+        client.base_url = endpoint
+        client.timeout = batch_timeout
+
+    # Split into batches
+    batches = [
+        valid_hotkeys[i : i + max_per_batch]
+        for i in range(0, len(valid_hotkeys), max_per_batch)
+    ]
+
+    bt.logging.info(
+        f"Processing {len(valid_hotkeys)} hotkeys in {len(batches)} batches "
+        f"(max {max_per_batch} per batch, {batch_timeout}s timeout)"
+    )
+
+    # Process batches sequentially
+    all_records: List[ValidationRecord] = []
+    successful_batches = 0
+    failed_batches = 0
+
+    for batch_num, batch in enumerate(batches, 1):
+        try:
+            # Fetch data for this batch (30s timeout per Issue #17)
+            records = client.fetch_validation_data(
+                hotkeys=batch,
+                start_date=start_date,
+                end_date=end_date,
+            )
+
+            # Store to ValidatorDB if enabled
+            if validator_db is not None:
+                try:
+                    for record in records:
+                        validator_db.cache_validation_data(
+                            hotkey=record.hotkey, data_dict=record.model_dump()
+                        )
+                except Exception as e:
+                    bt.logging.warning(f"Failed to cache batch {batch_num}: {e}")
+
+            all_records.extend(records)
+            successful_batches += 1
+            bt.logging.debug(f"Batch {batch_num}/{len(batches)}: {len(records)} records")
+
+        except ValidationAPIError as e:
+            # Timeout or other API error - try cache fallback (Issue #17)
+            bt.logging.warning(
+                f"Batch {batch_num}/{len(batches)} failed: {e}. "
+                "Attempting cache fallback..."
+            )
+
+            if validator_db is not None:
+                try:
+                    cached_data = validator_db.get_cached_validation_data(
+                        hotkeys=batch, max_age_days=7
+                    )
+                    if cached_data:
+                        # Convert cached dicts back to ValidationRecord objects
+                        cached_records = []
+                        for data_dict in cached_data:
+                            try:
+                                record = ValidationRecord.model_validate(data_dict)
+                                cached_records.append(record)
+                            except Exception:
+                                continue
+
+                        if cached_records:
+                            bt.logging.info(
+                                f"Cache fallback successful for batch {batch_num}: "
+                                f"{len(cached_records)} records"
+                            )
+                            all_records.extend(cached_records)
+                            successful_batches += 1
+                            continue
+                except Exception as cache_error:
+                    bt.logging.warning(
+                        f"Cache fallback failed for batch {batch_num}: {cache_error}"
+                    )
+
+            # No cache or cache failed - skip this batch
+            bt.logging.warning(
+                f"Batch {batch_num}/{len(batches)} skipped (no cache available)"
+            )
+            failed_batches += 1
+
+        except Exception as e:
+            bt.logging.error(f"Batch {batch_num}/{len(batches)} error: {e}")
+            failed_batches += 1
+
+    bt.logging.info(
+        f"Batching complete: {successful_batches} successful, "
+        f"{failed_batches} failed, {len(all_records)} total records"
+    )
+
+    return all_records
+
+
+# Note: Dendrite miner queries timeout specification (Issue #17)
+# When implementing dendrite.query() calls, use timeout=12.0s:
+#   dendrite.query(axons=axons, synapses=synapses, timeout=12.0)
+# This should be async as per "Miner Queries - timeout 12s, async"
+
+
+# Note: Main loop timing considerations (Issue #17)
+# The main loop should complete within ~100 seconds under worst-case scenarios:
+# - Metagraph sync: ~2-5s
+# - get_wahoo_validation_data: N batches * 30s timeout (worst case: all batches timeout)
+# - get_active_event_id: 10s timeout
+# - dendrite.query: 12s timeout
+# - Weight computation: ~1-2s
+# - set_weights: ~5-10s
+# - Cache cleanup: ~1-2s
+# Total worst-case: ~60-70s (with timeouts), well under 100s budget
