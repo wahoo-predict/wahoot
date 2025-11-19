@@ -23,6 +23,20 @@ DEFAULT_VALIDATION_ENDPOINT = (
 RETRY_STATUS_CODES = {429}
 RETRY_STATUS_CODES.update(range(500, 600))
 
+# Issue #27: Retry configuration constants
+# WAHOO validation API: up to 2 retries (3 total attempts) with exponential backoff
+# This ensures retries respect the ~100s main loop duration budget
+WAHOO_API_MAX_RETRIES = 2  # Total attempts = max_retries + 1 = 3
+WAHOO_API_BACKOFF_SECONDS = 1.0  # Exponential backoff: 1s, 2s, 4s (max 30s)
+
+# Event ID fetch: 0 retries (single attempt with fallback to default)
+# Minimal retries because a default event is available
+EVENT_ID_MAX_RETRIES = 0  # Single attempt only
+
+# set_weights() retry strategy (for future implementation)
+# Allow one safe retry if the failure is transient (network/RPC), otherwise fail for this loop
+SET_WEIGHTS_MAX_RETRIES = 1  # Total attempts = 2
+
 
 class ValidationAPIError(RuntimeError):
     """Raised when the validation endpoint cannot be queried successfully."""
@@ -40,13 +54,22 @@ def _parse_iso8601(value: str) -> datetime:
 
 
 class ValidationAPIClient:
+    """
+    HTTP client for WAHOO validation API with retry logic.
+
+    Implements Issue #27: Retry logic with explicit limits and attempt logging.
+    - WAHOO API: up to 2 retries (3 total attempts) with exponential backoff
+    - Retries respect the ~100s main loop duration budget
+    - All retry attempts are logged with attempt count and cause
+    """
+
     def __init__(
         self,
         base_url: Optional[str] = None,
         *,
         timeout: float = 30.0,
-        max_retries: int = 3,
-        backoff_seconds: float = 1.0,
+        max_retries: int = WAHOO_API_MAX_RETRIES,
+        backoff_seconds: float = WAHOO_API_BACKOFF_SECONDS,
         session: Optional[httpx.Client] = None,
     ):
         resolved_url = base_url or os.getenv(
@@ -124,40 +147,82 @@ class ValidationAPIClient:
         return deduped
 
     def _request_with_retries(self, params: Dict[str, str]) -> httpx.Response:
+        """
+        Make HTTP request with retry logic and attempt logging.
+
+        Implements Issue #27: Retry logic with explicit attempt count logging.
+        - WAHOO API: up to 2 retries (3 total attempts) with exponential backoff
+        - All retry attempts are logged with attempt count and cause
+        - Retries respect the ~100s main loop duration budget
+        - Timeouts are hard failures (no retry)
+
+        Args:
+            params: Query parameters for the request
+
+        Returns:
+            httpx.Response: Successful response (status 200)
+
+        Raises:
+            ValidationAPIError: If all retries are exhausted or timeout occurs
+        """
         # Use the endpoint from base_url (which comes from DEFAULT_VALIDATION_ENDPOINT)
         # The base_url already includes the full path, so use it directly
         url = self.base_url
         attempt = 0
-        while attempt < self.max_retries:
+        max_attempts = self.max_retries + 1  # Total attempts = retries + 1
+
+        while attempt < max_attempts:
             attempt += 1
+
+            # Issue #27: Log every retry attempt with its cause and attempt count
+            if attempt > 1:
+                bt.logging.info(
+                    f"ValidationAPI retry attempt {attempt}/{max_attempts} "
+                    f"(max_retries={self.max_retries})"
+                )
+
             try:
                 response = self._session.get(url, params=params)
             except httpx.TimeoutException as exc:
                 # Timeout is a hard failure - don't retry, raise immediately
+                # Issue #27: Log timeout with attempt count
                 bt.logging.error(
-                    f"ValidationAPI request timed out after {self.timeout}s: {exc}"
+                    f"ValidationAPI request timed out after {self.timeout}s "
+                    f"(attempt {attempt}/{max_attempts}): {exc}"
                 )
                 raise ValidationAPIError(
                     f"Validation API request timed out after {self.timeout}s"
                 ) from exc
             except httpx.HTTPError as exc:
-                bt.logging.warning(f"ValidationAPI request failed: {exc}")
-                if attempt >= self.max_retries:
+                # Issue #27: Log HTTP error with attempt count
+                bt.logging.warning(
+                    f"ValidationAPI request failed (attempt {attempt}/{max_attempts}): {exc}"
+                )
+                if attempt >= max_attempts:
+                    bt.logging.error(
+                        f"ValidationAPI exhausted all {max_attempts} attempts"
+                    )
                     raise ValidationAPIError(
-                        "Failed to reach validation endpoint"
+                        "Failed to reach validation endpoint after all retries"
                     ) from exc
                 self._sleep_backoff(attempt)
                 continue
 
             if response.status_code == 200:
+                if attempt > 1:
+                    bt.logging.info(
+                        f"ValidationAPI request succeeded on attempt {attempt}/{max_attempts}"
+                    )
                 return response
 
             if (
                 response.status_code in RETRY_STATUS_CODES
-                and attempt < self.max_retries
+                and attempt < max_attempts
             ):
+                # Issue #27: Log retry with status code and attempt count
                 bt.logging.warning(
-                    f"ValidationAPI transient error (status={response.status_code}), retrying..."
+                    f"ValidationAPI transient error (status={response.status_code}, "
+                    f"attempt {attempt}/{max_attempts}), retrying..."
                 )
                 self._sleep_backoff(attempt)
                 continue
@@ -209,8 +274,13 @@ def get_active_event_id(
     Get the active event ID from the WAHOO API.
 
     Implements Issue #17: Timeout specifications.
-    - Sets 10s timeout for httpx.get() call to /events
-    - On timeout, logs failure and falls back to default_event_id
+    Implements Issue #27: Retry logic (0 retries - single attempt with fallback).
+
+    Retry Strategy:
+    - Event ID fetch: 0 retries (single attempt only)
+    - Minimal retries because a default event is available
+    - On failure (timeout, network error, parsing error), falls back to default_event_id
+    - This ensures the main loop is not blocked by event ID fetch failures
 
     Args:
         api_base_url: Optional base URL for API (defaults to WAHOO_API_URL env var)
