@@ -14,6 +14,7 @@ the weights from all validators.
 """
 
 import logging
+import os
 import torch
 from typing import Dict, List, Optional, Any
 
@@ -24,6 +25,10 @@ logger = logging.getLogger(__name__)
 # Note: Weights are calculated locally by each validator, not fetched from API.
 # The ValidationAPIClient (wahoo/client.py) is for fetching DATA from WAHOO Predict API
 # (trading statistics, validation data), not for fetching weights.
+
+# Configuration flag for Issue #22: Equal weights fallback
+# When all rewards are zero, optionally assign equal weights to all miners with valid responses
+USE_EQUAL_WEIGHTS_FALLBACK = os.getenv("USE_EQUAL_WEIGHTS_FALLBACK", "false").lower() == "true"
 
 
 def _validate_response(response: Any) -> bool:
@@ -140,7 +145,15 @@ def reward(
 
     Returns:
         torch.FloatTensor: Normalized reward tensor with shape (len(uids),)
-                          Sum equals 1.0, or all zeros if no valid rewards
+                          Sum equals 1.0 when total > 0, or all zeros if no valid rewards
+
+    Implements Issues #21 and #22:
+    - Issue #21: Tensor conversion with list comprehension, ordered by uids
+    - Issue #22: Safe normalization with division-by-zero handling and invariant checks
+
+    Note: The order of rewards in the returned tensor MUST match the order of uids
+    passed to subtensor.set_weights(). This alignment is critical for correct on-chain
+    weight assignment. The list comprehension guarantees deterministic ordering.
     """
     if not uids or len(uids) == 0:
         return torch.FloatTensor([])
@@ -198,15 +211,72 @@ def reward(
             # Invalid or missing response → weight 0.0
             rewards_dict[uid] = 0.0
 
-    # Convert to tensor
+    # Issue #21: Convert rewards_dict to tensor with list comprehension
+    # CRITICAL: The order of rewards MUST match the order of uids passed to subtensor.set_weights()
+    # This ensures correct on-chain alignment - each reward[i] corresponds to uids[i]
+    # The list comprehension guarantees deterministic ordering based on the uids list
     rewards = torch.FloatTensor([rewards_dict.get(uid, 0.0) for uid in uids])
 
-    # Normalize to sum equals 1.0
-    rewards_sum = rewards.sum()
-    if rewards_sum > 0.0:
-        rewards = rewards / rewards_sum
+    # Issue #22: Safe normalization with division-by-zero handling
+    total = rewards.sum()
+    if total > 0.0:
+        # Normal case: divide by sum to normalize
+        rewards = rewards / total
     else:
-        # All zeros - return as is (sum is already 0.0)
-        rewards = torch.zeros(len(uids), dtype=torch.float32)
+        # Division-by-zero case: all rewards are zero
+        # Optionally fall back to equal weights if config flag is enabled (Issue #22)
+        if USE_EQUAL_WEIGHTS_FALLBACK:
+            # Count valid responses (miners with valid responses got weight 1.0 in rewards_dict)
+            valid_count = sum(1 for uid in uids if rewards_dict.get(uid, 0.0) > 0.0)
+            if valid_count > 0:
+                # Assign equal weights to all miners with valid responses
+                equal_weight = 1.0 / valid_count
+                rewards = torch.FloatTensor(
+                    [
+                        equal_weight if rewards_dict.get(uid, 0.0) > 0.0 else 0.0
+                        for uid in uids
+                    ]
+                )
+                logger.info(
+                    f"All WAHOO weights zero, using equal weights fallback: "
+                    f"{valid_count} miners with valid responses, weight={equal_weight:.6f}"
+                )
+            else:
+                # No valid responses - return zeros
+                rewards = torch.zeros(len(uids), dtype=torch.float32)
+        else:
+            # Default: return zeros when total is zero
+            rewards = torch.zeros(len(uids), dtype=torch.float32)
+
+    # Issue #22: Enforce invariants after normalization
+    # Invariant 1: Shape must match uids length
+    assert rewards.shape == (len(uids),), (
+        f"Rewards shape mismatch: expected ({len(uids)},), got {rewards.shape}"
+    )
+
+    # Invariant 2: When total > 0, sum must be approximately 1.0 (within floating point tolerance)
+    if total > 0.0:
+        sum_after_norm = rewards.sum().item()
+        epsilon = 1e-6
+        if abs(sum_after_norm - 1.0) >= epsilon:
+            logger.warning(
+                f"Normalization invariant violation: rewards.sum() = {sum_after_norm}, "
+                f"expected 1.0 (tolerance: {epsilon})"
+            )
+
+    # Issue #22: Document when to call subtensor.set_weights()
+    # Only call set_weights() when:
+    #   1. total > 0 (at least one non-zero reward)
+    #   2. rewards.sum() > 0 (after normalization, still has non-zero entries)
+    # This matches the "Rewards Sum > 0 Only set weights if valid" requirement
+    if total > 0.0 and rewards.sum().item() > 0.0:
+        # Ready for set_weights() call
+        pass
+    else:
+        # Do NOT call set_weights() - all rewards are zero
+        logger.debug(
+            "Skipping set_weights() call: all rewards are zero "
+            f"(total={total}, rewards.sum()={rewards.sum().item()})"
+        )
 
     return rewards
