@@ -215,10 +215,7 @@ class ValidationAPIClient:
                     )
                 return response
 
-            if (
-                response.status_code in RETRY_STATUS_CODES
-                and attempt < max_attempts
-            ):
+            if response.status_code in RETRY_STATUS_CODES and attempt < max_attempts:
                 # Issue #27: Log retry with status code and attempt count
                 bt.logging.warning(
                     f"ValidationAPI transient error (status={response.status_code}, "
