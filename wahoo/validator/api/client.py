@@ -12,11 +12,9 @@ from dotenv import load_dotenv
 from pydantic import ValidationError
 
 from ..models import ValidationRecord
+from .fallback import filter_usable_records
 
 load_dotenv()
-
-# Import fallback utilities (Issue #16)
-from .fallback import filter_usable_records
 
 DEFAULT_VALIDATION_ENDPOINT = (
     "https://api.wahoopredict.com/api/v2/event/bittensor/statistics"

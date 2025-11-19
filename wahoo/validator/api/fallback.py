@@ -114,4 +114,3 @@ __all__ = [
     "filter_usable_records",
     "should_skip_weight_computation",
 ]
-
