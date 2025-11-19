@@ -216,16 +216,24 @@ def test_get_wahoo_validation_data_handles_failed_batches():
     hotkeys = [f"hotkey_{i}" for i in range(500)]  # 2 batches with 256
 
     call_count = {"value": 0}
+    first_batch_calls = {"value": 0}
 
     def handler(request: httpx.Request) -> httpx.Response:
         call_count["value"] += 1
-        # First batch fails, second succeeds
-        if call_count["value"] == 1:
+        # Extract hotkeys from request to identify which batch
+        params = dict(request.url.params)
+        batch_hotkeys = params.get("hotkeys", "").split(",")
+
+        # Check if this is the first batch (256 hotkeys) or second batch (244 hotkeys)
+        is_first_batch = len(batch_hotkeys) == 256
+
+        if is_first_batch:
+            first_batch_calls["value"] += 1
+            # First batch always fails (even on retry)
+            # With max_retries=1, we get 2 attempts for first batch
             return httpx.Response(500, json={"error": "server error"})
         else:
-            # Extract hotkeys from request
-            params = dict(request.url.params)
-            batch_hotkeys = params.get("hotkeys", "").split(",")
+            # Second batch succeeds
             return httpx.Response(
                 200,
                 json={
@@ -241,7 +249,7 @@ def test_get_wahoo_validation_data_handles_failed_batches():
     client = ValidationAPIClient(
         base_url="https://api.example.com",
         session=session,
-        max_retries=1,  # Quick failure
+        max_retries=1,  # 2 total attempts (1 initial + 1 retry)
         backoff_seconds=0.01,
     )
 
@@ -251,8 +259,11 @@ def test_get_wahoo_validation_data_handles_failed_batches():
         client=client,
     )
 
-    # Should have processed both batches (even though first failed)
-    assert call_count["value"] == 2
+    # With max_retries=1, first batch gets 2 attempts (1 initial + 1 retry)
+    # Second batch gets 1 attempt
+    # Total: 3 calls (2 for first batch + 1 for second batch)
+    assert call_count["value"] == 3
+    assert first_batch_calls["value"] == 2  # First batch attempted twice
     # Should have records from second batch only (244 records: 500 - 256)
     assert len(records) == 244
 
