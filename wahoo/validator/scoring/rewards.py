@@ -19,6 +19,7 @@ import torch
 from typing import Dict, List, Optional, Any
 
 from wahoo.validator.utils.miners import build_uid_to_hotkey, is_valid_hotkey
+from wahoo.validator.models import ValidationRecord
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,9 @@ logger = logging.getLogger(__name__)
 # Configuration flag for Issue #22: Equal weights fallback
 # When all rewards are zero, optionally assign equal weights to all miners with valid responses
 USE_EQUAL_WEIGHTS_FALLBACK = os.getenv("USE_EQUAL_WEIGHTS_FALLBACK", "false").lower() == "true"
+# Threshold constants for Issue #20
+MIN_VOLUME_USD = 0.0  # Minimum total volume in USD (0.0 = no minimum by default)
+MIN_WIN_RATE = 0.0  # Minimum win rate (0.0-1.0, 0.0 = no minimum by default)
 
 
 def _validate_response(response: Any) -> bool:
@@ -70,6 +74,41 @@ def _validate_response(response: Any) -> bool:
         return True
     except (ValueError, TypeError, AttributeError):
         return False
+
+
+def _check_thresholds(record: ValidationRecord) -> tuple[bool, Optional[str]]:
+    """
+    Check if validation record passes minimum thresholds.
+
+    Implements Issue #20: Threshold checks for MIN_VOLUME_USD and MIN_WIN_RATE.
+
+    Args:
+        record: ValidationRecord to check
+
+    Returns:
+        tuple[bool, Optional[str]]: (passes_thresholds, failure_reason)
+        - passes_thresholds: True if record passes all thresholds
+        - failure_reason: None if passes, or reason string if fails
+    """
+    if not record or not record.performance:
+        return False, "missing validation data"
+
+    perf = record.performance
+
+    # Check MIN_VOLUME_USD threshold
+    volume = perf.total_volume_usd
+    if volume is None or volume < MIN_VOLUME_USD:
+        return False, f"volume below threshold (volume={volume}, min={MIN_VOLUME_USD})"
+
+    # Check MIN_WIN_RATE threshold (if win_rate is available)
+    win_rate = perf.win_rate
+    if win_rate is not None and win_rate < MIN_WIN_RATE:
+        return (
+            False,
+            f"win_rate below threshold (win_rate={win_rate}, min={MIN_WIN_RATE})",
+        )
+
+    return True, None
 
 
 def _get_hotkey_from_uid(
@@ -119,11 +158,17 @@ def reward(
     """
     Compute rewards for miners using a strict priority system.
 
+    Implements Issue #20: Build reward dictionary with threshold checks and detailed logging.
+
     Priority System (applied per-UID):
     1. PRIMARY: Use wahoo_weights[hotkey] (local scoring output from this validator) when available
     2. FALLBACK: Validate miner response:
        - If valid (prob_yes in [0,1] and prob_yes + prob_no = 1.0) → weight 1.0
        - If invalid or missing → weight 0.0
+
+    Threshold Checks (Issue #20):
+    - Miners below MIN_VOLUME_USD or MIN_WIN_RATE are assigned weight 0
+    - Detailed logging explains why weight is 0 (missing data vs thresholds vs invalid response)
 
     Note: Weights are calculated locally by each validator based on WAHOO Predict API data.
     Multiple validators run independently and calculate their own weights. Bittensor's
@@ -154,6 +199,9 @@ def reward(
     Note: The order of rewards in the returned tensor MUST match the order of uids
     passed to subtensor.set_weights(). This alignment is critical for correct on-chain
     weight assignment. The list comprehension guarantees deterministic ordering.
+                          Sum equals 1.0, or all zeros if no valid rewards
+
+    Note: rewards_dict is the single source of truth before tensor conversion (Issue #20).
     """
     if not uids or len(uids) == 0:
         return torch.FloatTensor([])
@@ -166,19 +214,26 @@ def reward(
         )
         return torch.zeros(len(uids), dtype=torch.float32)
 
-    # Build uid_to_hotkey mapping if not provided
+    # Build uid_to_hotkey mapping if not provided (Issue #20: Task 1)
     if uid_to_hotkey is None:
         logger.debug("Building uid_to_hotkey mapping from metagraph")
         uid_to_hotkey = build_uid_to_hotkey(metagraph, active_uids=uids)
 
-    # Initialize rewards dictionary
+    # Initialize rewards dictionary (Issue #20: Single source of truth)
     rewards_dict: Dict[int, float] = {}
 
     # Normalize wahoo_weights to empty dict if None
     if wahoo_weights is None:
         wahoo_weights = {}
 
-    # Process each UID independently (per-UID priority)
+    # Build hotkey -> ValidationRecord mapping for threshold checks
+    validation_by_hotkey: Dict[str, ValidationRecord] = {}
+    if wahoo_validation_data:
+        for record in wahoo_validation_data:
+            if isinstance(record, ValidationRecord):
+                validation_by_hotkey[record.hotkey] = record
+
+    # Process each UID independently (per-UID priority) - Issue #20: Task 1 & 2
     for idx, uid in enumerate(uids):
         response = responses[idx] if idx < len(responses) else None
         hotkey = _get_hotkey_from_uid(uid, metagraph, uid_to_hotkey)
@@ -186,35 +241,87 @@ def reward(
         # Sanity check: if UID has no hotkey or malformed hotkey, set reward to 0 and log
         if hotkey is None or not is_valid_hotkey(hotkey):
             logger.warning(
-                f"UID {uid} has no hotkey or malformed hotkey. " "Setting reward to 0.0"
+                f"UID {uid}: missing or invalid hotkey. Setting weight to 0.0"
             )
             rewards_dict[uid] = 0.0
             continue
 
         # PRIORITY 1: PRIMARY - Use WAHOO weights (local scoring from this validator)
+        # Issue #20: Task 2 - Resolve weight using priority system
         if hotkey in wahoo_weights:
             weight = wahoo_weights[hotkey]
             # Validate weight is a valid number
             try:
                 weight_float = float(weight)
                 if weight_float >= 0.0:  # Allow zero but not negative
-                    rewards_dict[uid] = weight_float
+                    # Check thresholds before assigning weight (Issue #20: Task 4)
+                    validation_record = validation_by_hotkey.get(hotkey)
+                    if validation_record:
+                        passes, reason = _check_thresholds(validation_record)
+                        if not passes:
+                            logger.warning(
+                                f"UID {uid} (hotkey={hotkey}): "
+                                f"failing thresholds - {reason}. Setting weight to 0.0"
+                            )
+                            rewards_dict[uid] = 0.0
+                        else:
+                            # Issue #20: Task 3 - Store resolved weight in rewards_dict
+                            rewards_dict[uid] = weight_float
+                    else:
+                        # No validation data, but we have WAHOO weight - use it
+                        rewards_dict[uid] = weight_float
                     continue
             except (ValueError, TypeError):
                 pass  # Fall through to fallback
 
         # PRIORITY 2: FALLBACK - Validate response and assign temporary weight
+        # Issue #20: Task 2 - Resolve weight using priority system (fallback path)
         if _validate_response(response):
             # Valid response → temporary weight 1.0
-            rewards_dict[uid] = 1.0
+            # But first check thresholds if validation data exists (Issue #20: Task 4)
+            validation_record = validation_by_hotkey.get(hotkey)
+            if validation_record:
+                passes, reason = _check_thresholds(validation_record)
+                if not passes:
+                    logger.warning(
+                        f"UID {uid} (hotkey={hotkey}): "
+                        f"failing thresholds - {reason}. Setting weight to 0.0"
+                    )
+                    rewards_dict[uid] = 0.0
+                else:
+                    rewards_dict[uid] = 1.0
+            else:
+                # No validation data, but valid response - use fallback weight
+                rewards_dict[uid] = 1.0
         else:
             # Invalid or missing response → weight 0.0
+            # Issue #20: Task 5 - Log reason for weight 0
+            validation_record = validation_by_hotkey.get(hotkey)
+            if validation_record:
+                passes, reason = _check_thresholds(validation_record)
+                if not passes:
+                    logger.warning(
+                        f"UID {uid} (hotkey={hotkey}): "
+                        f"failing thresholds - {reason}. Setting weight to 0.0"
+                    )
+                else:
+                    logger.debug(
+                        f"UID {uid} (hotkey={hotkey}): "
+                        "invalid response. Setting weight to 0.0"
+                    )
+            else:
+                logger.debug(
+                    f"UID {uid} (hotkey={hotkey}): "
+                    "missing validation data and invalid response. Setting weight to 0.0"
+                )
             rewards_dict[uid] = 0.0
 
     # Issue #21: Convert rewards_dict to tensor with list comprehension
     # CRITICAL: The order of rewards MUST match the order of uids passed to subtensor.set_weights()
     # This ensures correct on-chain alignment - each reward[i] corresponds to uids[i]
     # The list comprehension guarantees deterministic ordering based on the uids list
+    # Issue #20: Task 6 - rewards_dict is the single source of truth before tensor conversion
+    # Convert to tensor from rewards_dict
     rewards = torch.FloatTensor([rewards_dict.get(uid, 0.0) for uid in uids])
 
     # Issue #22: Safe normalization with division-by-zero handling
