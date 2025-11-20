@@ -10,14 +10,17 @@ import logging
 import os
 import time
 from typing import Dict, List, Optional, Any
+from unittest.mock import Mock
 
 import bittensor as bt
+import torch
 from dotenv import load_dotenv
 
 from .api import get_active_event_id, get_wahoo_validation_data
 from .blockchain import set_weights_with_retry
 from .scoring.rewards import reward
 from .utils.miners import build_uid_to_hotkey, get_active_uids
+from wahoo.protocol.protocol import WAHOOPredict
 
 # Load environment variables
 load_dotenv()
@@ -47,6 +50,63 @@ def load_validator_config() -> Dict[str, Any]:
             "https://api.wahoopredict.com/api/v2/event/bittensor/statistics",
         ),
     }
+
+
+def initialize_bittensor_mock(
+    netuid: int,
+) -> tuple[bt.Wallet, bt.Subtensor, bt.Dendrite, bt.Metagraph]:
+    """
+    Initialize mock Bittensor components for simulation/testing.
+
+    Args:
+        netuid: Subnet UID
+
+    Returns:
+        Tuple of (wallet, subtensor, dendrite, metagraph) - all mocked
+    """
+    logger.info("Initializing MOCK Bittensor components (simulation mode)...")
+
+    # Mock wallet
+    wallet = Mock(spec=bt.Wallet)
+    wallet.name = "mock_wallet"
+    wallet.hotkey = Mock()
+    logger.info("Mock wallet created")
+
+    # Mock subtensor
+    subtensor = Mock(spec=bt.Subtensor)
+    subtensor.network = "mock"
+    # Mock set_weights to return a transaction hash string (what the code expects)
+    def mock_set_weights(*args, **kwargs):
+        return "mock_tx_hash_12345"  # Return string (transaction hash)
+    subtensor.set_weights = Mock(side_effect=mock_set_weights)
+    logger.info("Mock subtensor created")
+
+    # Mock dendrite
+    dendrite = Mock(spec=bt.Dendrite)
+    logger.info("Mock dendrite created")
+
+    # Mock metagraph with registered miners (from mock API)
+    # These hotkeys match the ones in mock_api_server.py
+    mock_hotkeys = [
+        "5Dnh2o9x9kTRtfeF5g3W4uzfzWNeGD1EJo4aCtibAESzP2iE",
+        "5FddqPQUhEFeLqVNbenAj6EDRKuqgezciN9TmTgBmNABsj53",
+        "5E2WWRc41ekrak33NjqZZ338s2sEX5rLCnZXEGKfD52PMqod",
+        "5EaNWwsjZpoM6RDwgKoukSHJZ2yyEHmGGXogRejdBwCNV9SP",
+        "5De1Fkvq9g4idEzvr8h8WEEQa1xAeaXfA2TZfYMKgdMm4Qai",
+    ]
+    
+    metagraph = Mock(spec=bt.Metagraph)
+    metagraph.uids = torch.tensor(list(range(len(mock_hotkeys))))
+    metagraph.axons = [Mock(ip="127.0.0.1", port=8091 + i) for i in range(len(mock_hotkeys))]
+    metagraph.hotkeys = mock_hotkeys
+    metagraph.netuid = netuid
+    # Mock sync method to return self (no-op in mock mode)
+    metagraph.sync = Mock(return_value=metagraph)
+    
+    logger.info(f"Mock metagraph created: {len(metagraph.uids)} UIDs on subnet {netuid}")
+    logger.warning("⚠️  Running in MOCK mode - no real blockchain connection!")
+
+    return wallet, subtensor, dendrite, metagraph
 
 
 def initialize_bittensor(
@@ -135,11 +195,9 @@ def query_miners(
     active_uids: List[int],
     event_id: str,
     timeout: float = 12.0,
-) -> List[Any]:
+) -> List[WAHOOPredict]:
     """
     Query miners via dendrite for their predictions.
-
-    NOTE: This is a placeholder implementation. Requires protocol/synapse definition.
 
     Args:
         dendrite: Dendrite instance for queries
@@ -149,31 +207,46 @@ def query_miners(
         timeout: Query timeout in seconds (default 12.0 per Issue #17)
 
     Returns:
-        List of miner responses (synapse objects)
-
-    TODO:
-        - Define WAHOOPredict synapse in wahoo/protocol/protocol.py
-        - Create synapses with event_id
-        - Get axons from metagraph
-        - Call dendrite.query() with timeout
-        - Handle responses and timeouts
+        List of WAHOOPredict synapse responses (may include None for failed queries)
     """
-    logger.warning(
-        "query_miners() is a placeholder - protocol definition needed"
-    )
+    if not active_uids:
+        logger.warning("No active UIDs to query")
+        return []
+    
     logger.debug(
-        f"Would query {len(active_uids)} miners for event_id={event_id} "
+        f"Querying {len(active_uids)} miners for event_id={event_id} "
         f"with timeout={timeout}s"
     )
-
-    # Placeholder: Return empty list for now
-    # When protocol is defined, this will:
-    # 1. Get axons: axons = [metagraph.axons[uid] for uid in active_uids]
-    # 2. Create synapses: synapses = [WAHOOPredict(event_id=event_id) for _ in active_uids]
-    # 3. Query: responses = dendrite.query(axons=axons, synapses=synapses, timeout=timeout)
-    # 4. Return responses
-
-    return [None] * len(active_uids)  # Placeholder: all None responses
+    
+    # Get axons for active UIDs
+    # Handle both real metagraph and mock metagraph
+    if isinstance(metagraph.axons, list):
+        axons = [metagraph.axons[uid] for uid in active_uids]
+    else:
+        # Mock metagraph - axons might be a Mock object
+        # Try to access as list, fallback to empty list
+        try:
+            axons = [metagraph.axons[uid] for uid in active_uids]
+        except (TypeError, IndexError):
+            logger.warning("Could not extract axons from metagraph (mock mode), using empty list")
+            axons = []
+    
+    # Create synapses with event_id
+    synapses = [WAHOOPredict(event_id=event_id) for _ in active_uids]
+    
+    # Query miners
+    try:
+        responses = dendrite.query(
+            axons=axons,
+            synapses=synapses,
+            timeout=timeout,
+        )
+        logger.info(f"Received {len(responses)} responses from miners")
+        return responses
+    except Exception as e:
+        logger.error(f"Error querying miners: {e}")
+        # Return list of None for failed queries
+        return [None] * len(active_uids)
 
 
 def compute_weights(
@@ -407,9 +480,111 @@ def main() -> None:
 
     Initializes Bittensor components and enters the main loop.
     """
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="WaHoo Predict Bittensor Validator",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    
+    # Network configuration
+    parser.add_argument(
+        "--netuid",
+        type=int,
+        default=int(os.getenv("NETUID", "1")),
+        help="Subnet UID",
+    )
+    parser.add_argument(
+        "--network",
+        type=str,
+        default=os.getenv("NETWORK", "local"),
+        choices=["local", "test", "finney"],
+        help="Bittensor network",
+    )
+    
+    # Wallet configuration
+    parser.add_argument(
+        "--wallet.name",
+        type=str,
+        default=os.getenv("WALLET_NAME", "default"),
+        dest="wallet_name",
+        help="Wallet name (coldkey)",
+    )
+    parser.add_argument(
+        "--wallet.hotkey",
+        type=str,
+        default=os.getenv("HOTKEY_NAME", "default"),
+        dest="hotkey_name",
+        help="Hotkey name",
+    )
+    
+    # Validator configuration
+    parser.add_argument(
+        "--loop-interval",
+        type=float,
+        default=float(os.getenv("LOOP_INTERVAL", "100.0")),
+        dest="loop_interval",
+        help="Main loop interval in seconds",
+    )
+    parser.add_argument(
+        "--use-validator-db",
+        action="store_true",
+        default=os.getenv("USE_VALIDATOR_DB", "false").lower() == "true",
+        dest="use_validator_db",
+        help="Enable ValidatorDB caching",
+    )
+    parser.add_argument(
+        "--validator-db-path",
+        type=str,
+        default=os.getenv("VALIDATOR_DB_PATH", "validator.db"),
+        dest="validator_db_path",
+        help="Path to validator database",
+    )
+    
+    # API configuration
+    parser.add_argument(
+        "--wahoo-api-url",
+        type=str,
+        default=os.getenv("WAHOO_API_URL", "https://api.wahoopredict.com"),
+        dest="wahoo_api_url",
+        help="WAHOO API base URL",
+    )
+    parser.add_argument(
+        "--wahoo-validation-endpoint",
+        type=str,
+        default=os.getenv(
+            "WAHOO_VALIDATION_ENDPOINT",
+            "https://api.wahoopredict.com/api/v2/event/bittensor/statistics",
+        ),
+        dest="wahoo_validation_endpoint",
+        help="WAHOO validation endpoint URL",
+    )
+    
+    # Logging configuration
+    parser.add_argument(
+        "--log-level",
+        type=str,
+        default=os.getenv("LOG_LEVEL", "INFO"),
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        dest="log_level",
+        help="Logging level",
+    )
+    
+    # Simulation/Mock mode
+    parser.add_argument(
+        "--mock",
+        action="store_true",
+        default=os.getenv("MOCK_MODE", "false").lower() == "true",
+        dest="mock_mode",
+        help="Run in mock mode (no real Bittensor connection, for simulation/testing)",
+    )
+    
+    args = parser.parse_args()
+    
     # Configure logging
+    log_level = getattr(logging, args.log_level.upper())
     logging.basicConfig(
-        level=logging.INFO,
+        level=log_level,
         format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
@@ -418,18 +593,53 @@ def main() -> None:
     logger.info("WaHoo Predict Validator")
     logger.info("=" * 70)
 
-    # Load configuration
-    config = load_validator_config()
-    logger.info(f"Configuration loaded: netuid={config['netuid']}, network={config['network']}")
+    # Auto-initialize on first run (if database doesn't exist)
+    from .database.validator_db import check_database_exists, get_db_path
+    db_path = get_db_path()
+    if not check_database_exists(db_path):
+        logger.info("First run detected - initializing database...")
+        try:
+            from .init import initialize
+            initialize(skip_deps=True, skip_db=False, db_path=str(db_path))
+            logger.info("✓ Database initialized successfully")
+        except Exception as e:
+            logger.warning(f"Auto-initialization failed: {e}")
+            logger.info("You can manually run: wahoo-validator-init")
+            logger.info("Continuing anyway...")
+
+    # Build configuration from args
+    config = {
+        "netuid": args.netuid,
+        "network": args.network,
+        "wallet_name": args.wallet_name,
+        "hotkey_name": args.hotkey_name,
+        "loop_interval": args.loop_interval,
+        "use_validator_db": args.use_validator_db,
+        "wahoo_api_url": args.wahoo_api_url,
+        "wahoo_validation_endpoint": args.wahoo_validation_endpoint,
+    }
+    
+    logger.info(f"Configuration:")
+    logger.info(f"  Network: {config['network']}")
+    logger.info(f"  Subnet UID: {config['netuid']}")
+    logger.info(f"  Wallet: {config['wallet_name']}/{config['hotkey_name']}")
+    logger.info(f"  Loop interval: {config['loop_interval']}s")
+    logger.info(f"  ValidatorDB: {config['use_validator_db']}")
+    logger.info(f"  Mock mode: {args.mock_mode}")
 
     # Initialize Bittensor components
     try:
-        wallet, subtensor, dendrite, metagraph = initialize_bittensor(
-            wallet_name=config["wallet_name"],
-            hotkey_name=config["hotkey_name"],
-            netuid=config["netuid"],
-            network=config["network"],
-        )
+        if args.mock_mode:
+            wallet, subtensor, dendrite, metagraph = initialize_bittensor_mock(
+                netuid=config["netuid"],
+            )
+        else:
+            wallet, subtensor, dendrite, metagraph = initialize_bittensor(
+                wallet_name=config["wallet_name"],
+                hotkey_name=config["hotkey_name"],
+                netuid=config["netuid"],
+                network=config["network"],
+            )
     except Exception as e:
         logger.error(f"Failed to initialize Bittensor: {e}")
         return
@@ -438,7 +648,7 @@ def main() -> None:
     validator_db = None
     # if config["use_validator_db"]:
     #     from .database.validator_db import ValidatorDB
-    #     validator_db = ValidatorDB(db_path=os.getenv("VALIDATOR_DB_PATH"))
+    #     validator_db = ValidatorDB(db_path=args.validator_db_path)
 
     # Enter main loop
     logger.info("Entering main loop...")
