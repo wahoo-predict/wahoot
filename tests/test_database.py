@@ -140,8 +140,7 @@ class TestGetOrCreateDatabase:
             try:
                 cursor = conn.cursor()
 
-                # Check that schema tables exist
-                cursor.execute()
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
                 tables = [row[0] for row in cursor.fetchall()]
 
                 assert "miners" in tables
