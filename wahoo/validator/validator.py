@@ -153,18 +153,18 @@ def query_miners(
     if not active_uids:
         logger.warning("No active UIDs to query")
         return []
-    
+
     logger.debug(
         f"Querying {len(active_uids)} miners for event_id={event_id} "
         f"with timeout={timeout}s"
     )
-    
+
     # Get axons for active UIDs
     axons = [metagraph.axons[uid] for uid in active_uids]
-    
+
     # Create synapses with event_id
     synapses = [WAHOOPredict(event_id=event_id) for _ in active_uids]
-    
+
     # Query miners
     try:
         responses = dendrite.query(
@@ -417,7 +417,7 @@ def main() -> None:
         description="WaHoo Predict Bittensor Validator",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    
+
     # Network configuration
     parser.add_argument(
         "--netuid",
@@ -432,7 +432,7 @@ def main() -> None:
         choices=["test", "finney"],
         help="Bittensor network",
     )
-    
+
     # Wallet configuration
     parser.add_argument(
         "--wallet.name",
@@ -448,7 +448,7 @@ def main() -> None:
         dest="hotkey_name",
         help="Hotkey name",
     )
-    
+
     # Validator configuration
     parser.add_argument(
         "--loop-interval",
@@ -471,7 +471,7 @@ def main() -> None:
         dest="validator_db_path",
         help="Path to validator database",
     )
-    
+
     # API configuration
     parser.add_argument(
         "--wahoo-api-url",
@@ -490,7 +490,7 @@ def main() -> None:
         dest="wahoo_validation_endpoint",
         help="WAHOO validation endpoint URL",
     )
-    
+
     # Logging configuration
     parser.add_argument(
         "--log-level",
@@ -500,9 +500,9 @@ def main() -> None:
         dest="log_level",
         help="Logging level",
     )
-    
+
     args = parser.parse_args()
-    
+
     # Configure logging
     log_level = getattr(logging, args.log_level.upper())
     logging.basicConfig(
@@ -540,8 +540,8 @@ def main() -> None:
         "wahoo_api_url": args.wahoo_api_url,
         "wahoo_validation_endpoint": args.wahoo_validation_endpoint,
     }
-    
-    logger.info(f"Configuration:")
+
+    logger.info("Configuration:")
     logger.info(f"  Network: {config['network']}")
     logger.info(f"  Subnet UID: {config['netuid']}")
     logger.info(f"  Wallet: {config['wallet_name']}/{config['hotkey_name']}")
