@@ -23,19 +23,16 @@ def check_virtual_env() -> Optional[Path]:
 
 
 def check_dependencies() -> bool:
-    """Check if required dependencies are installed."""
-    # Map package names (pip install name) to import names (Python module name)
     required_packages = {
         "bittensor": "bittensor",
         "httpx": "httpx",
         "torch": "torch",
         "sqlalchemy": "sqlalchemy",
         "alembic": "alembic",
-        "python-dotenv": "dotenv",  # Package name vs import name
+        "python-dotenv": "dotenv",
         "pandas": "pandas",
         "numpy": "numpy",
     }
-    # Try to import packages and if not found, return as list to import.
     missing = []
     for package_name, import_name in required_packages.items():
         try:
@@ -65,29 +62,23 @@ def check_uv_available() -> bool:
 def install_dependencies(venv_path: Optional[Path] = None) -> bool:
     print("Attempting to install missing dependencies...")
 
-    # Check if uv is available (preferred)
     use_uv = check_uv_available()
 
     project_root = Path(__file__).parent.parent.parent
     pyproject_file = project_root / "pyproject.toml"
     requirements_file = project_root / "requirements.txt"
 
-    # Check if running as root
     is_root = os.geteuid() == 0 if hasattr(os, "geteuid") else False
 
     if use_uv:
-        # Use uv for installation
         print("Using uv for dependency installation...")
         try:
             if venv_path:
-                # Install into existing venv (Unix/Linux only)
                 python_exe = str(venv_path / "bin" / "python")
                 cmd = ["uv", "pip", "install", "--python", python_exe]
             else:
-                # Install into current environment
                 cmd = ["uv", "pip", "install"]
 
-            # Use pyproject.toml if available, otherwise requirements.txt
             if pyproject_file.exists():
                 cmd.extend(["-e", "."])
             elif requirements_file.exists():
@@ -107,13 +98,11 @@ def install_dependencies(venv_path: Optional[Path] = None) -> bool:
             print("ERROR: Failed to install dependencies with uv:")
             print(e.stderr)
             print("\nFalling back to pip...")
-            use_uv = False  # Fall through to pip
+            use_uv = False
 
-    # Fallback to pip
     if not use_uv:
         print("Using pip for dependency installation...")
 
-        # Check if we need sudo
         try:
             result = subprocess.run(
                 [
@@ -151,17 +140,14 @@ def install_dependencies(venv_path: Optional[Path] = None) -> bool:
             print("=" * 70)
             return False
 
-        # Install requirements
         if not pyproject_file.exists() and not requirements_file.exists():
             print("ERROR: Neither pyproject.toml nor requirements.txt found")
             return False
 
         try:
             if pyproject_file.exists():
-                # Install from pyproject.toml
                 cmd = [sys.executable, "-m", "pip", "install", "-e", "."]
             else:
-                # Install from requirements.txt
                 cmd = [
                     sys.executable,
                     "-m",
@@ -190,7 +176,6 @@ def check_sqlite() -> bool:
     try:
         import sqlite3
 
-        # Test SQLite version
         conn = sqlite3.connect(":memory:")
         cursor = conn.cursor()
         cursor.execute("SELECT sqlite_version()")
@@ -206,7 +191,6 @@ def check_sqlite() -> bool:
 def get_db_path() -> Path:
     db_path = os.getenv("VALIDATOR_DB_PATH", "validator.db")
     if not os.path.isabs(db_path):
-        # Default to project root
         project_root = Path(__file__).parent.parent.parent
         db_path = project_root / db_path
     return Path(db_path)
@@ -228,10 +212,8 @@ def check_database_exists(db_path: Path) -> bool:
 def create_database(db_path: Path) -> bool:
     print(f"Creating database at {db_path}...")
 
-    # Ensure parent directory exists
     db_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Read and execute schema
     schema_file = Path(__file__).parent / "database" / "schema.sql"
     if not schema_file.exists():
         print(f"ERROR: Schema file not found at {schema_file}")
@@ -242,7 +224,6 @@ def create_database(db_path: Path) -> bool:
         with open(schema_file, "r") as f:
             schema_sql = f.read()
 
-        # Execute schema
         conn.executescript(schema_sql)
         conn.close()
         print(f"Database created successfully at {db_path}")
@@ -257,14 +238,12 @@ def check_alembic_head() -> Tuple[bool, Optional[str]]:
         from alembic.config import Config
         from alembic.script import ScriptDirectory
 
-        # Get alembic directory
         alembic_dir = Path(__file__).parent / "database" / "alembic"
         alembic_ini = Path(__file__).parent / "database" / "alembic.ini"
 
         if not alembic_ini.exists():
             return False, "alembic.ini not found"
 
-        # Change to database directory for alembic
         original_cwd = os.getcwd()
         os.chdir(alembic_dir.parent)
 
@@ -272,7 +251,6 @@ def check_alembic_head() -> Tuple[bool, Optional[str]]:
             alembic_cfg = Config(str(alembic_ini))
             script = ScriptDirectory.from_config(alembic_cfg)
 
-            # Get current revision
             try:
                 from alembic.runtime.migration import MigrationContext
                 from sqlalchemy import create_engine
@@ -285,11 +263,9 @@ def check_alembic_head() -> Tuple[bool, Optional[str]]:
             except Exception:
                 current_rev = None
 
-            # Get head revision
             head_rev = script.get_current_head()
 
             if head_rev is None:
-                # No migrations exist yet - this is OK for first run
                 return True, None
 
             if current_rev == head_rev:
@@ -351,7 +327,6 @@ def upgrade_database() -> bool:
 def load_config() -> dict:
     config = {}
 
-    # Load .env file if dotenv is available
     if load_dotenv:
         project_root = Path(__file__).parent.parent.parent
         env_file = project_root / ".env"
@@ -359,14 +334,12 @@ def load_config() -> dict:
             load_dotenv(env_file)
             print(f"Loaded environment variables from {env_file}")
 
-    # Load common config variables
     config["VALIDATOR_DB_PATH"] = os.getenv("VALIDATOR_DB_PATH", "validator.db")
 
     return config
 
 
 def parse_args() -> argparse.Namespace:
-    """Parse command line arguments."""
     parser = argparse.ArgumentParser(
         description="Initialize validator environment and database"
     )
@@ -400,12 +373,10 @@ def initialize(
     print("Validator Initialization")
     print("=" * 70)
 
-    # Load configuration
     config = load_config()
     if db_path:
         config["VALIDATOR_DB_PATH"] = db_path
 
-    # Check dependencies
     if not skip_deps:
         print("\n[1/4] Checking dependencies...")
         venv_path = check_virtual_env()
@@ -415,7 +386,6 @@ def initialize(
         if not check_dependencies():
             if not install_dependencies(venv_path):
                 return 1
-            # Verify installation
             if not check_dependencies():
                 print("ERROR: Dependencies still missing after installation attempt")
                 return 1
@@ -423,14 +393,12 @@ def initialize(
     else:
         print("\n[1/4] Skipping dependency check")
 
-    # Check SQLite
     print("\n[2/4] Checking SQLite...")
     if not check_sqlite():
         print("ERROR: SQLite check failed")
         return 1
     print("✓ SQLite available")
 
-    # Database initialization
     if not skip_db:
         print("\n[3/4] Checking database...")
         db_path_obj = get_db_path()
@@ -440,7 +408,6 @@ def initialize(
             if not create_database(db_path_obj):
                 return 1
 
-        # Check Alembic head
         is_at_head, message = check_alembic_head()
         if not is_at_head:
             if message:
@@ -452,7 +419,6 @@ def initialize(
     else:
         print("\n[3/4] Skipping database check")
 
-    # Final checks
     print("\n[4/4] Final checks...")
     print(f"✓ Database path: {get_db_path()}")
     print("✓ Configuration loaded")

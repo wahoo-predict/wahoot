@@ -23,27 +23,19 @@ DEFAULT_VALIDATION_ENDPOINT = (
 RETRY_STATUS_CODES = {429}
 RETRY_STATUS_CODES.update(range(500, 600))
 
-# Issue #27: Retry configuration constants
-# WAHOO validation API: up to 2 retries (3 total attempts) with exponential backoff
-# This ensures retries respect the ~100s main loop duration budget
-WAHOO_API_MAX_RETRIES = 2  # Total attempts = max_retries + 1 = 3
-WAHOO_API_BACKOFF_SECONDS = 1.0  # Exponential backoff: 1s, 2s, 4s (max 30s)
+WAHOO_API_MAX_RETRIES = 2
+WAHOO_API_BACKOFF_SECONDS = 1.0
 
-# Event ID fetch: 0 retries (single attempt with fallback to default)
-# Minimal retries because a default event is available
-EVENT_ID_MAX_RETRIES = 0  # Single attempt only
+EVENT_ID_MAX_RETRIES = 0
 
-# set_weights() retry strategy (for future implementation)
-# Allow one safe retry if the failure is transient (network/RPC), otherwise fail for this loop
-SET_WEIGHTS_MAX_RETRIES = 1  # Total attempts = 2
+SET_WEIGHTS_MAX_RETRIES = 1
 
 
 class ValidationAPIError(RuntimeError):
-    """Raised when the validation endpoint cannot be queried successfully."""
+    pass
 
 
 def _parse_iso8601(value: str) -> datetime:
-    """Parse ISO-8601 strings"""
     normalized = value.strip()
     if normalized.endswith("Z"):
         normalized = normalized[:-1] + "+00:00"
@@ -54,15 +46,6 @@ def _parse_iso8601(value: str) -> datetime:
 
 
 class ValidationAPIClient:
-    """
-    HTTP client for WAHOO validation API with retry logic.
-
-    Implements Issue #27: Retry logic with explicit limits and attempt logging.
-    - WAHOO API: up to 2 retries (3 total attempts) with exponential backoff
-    - Retries respect the ~100s main loop duration budget
-    - All retry attempts are logged with attempt count and cause
-    """
-
     def __init__(
         self,
         base_url: Optional[str] = None,
@@ -75,7 +58,6 @@ class ValidationAPIClient:
         resolved_url = base_url or os.getenv(
             "WAHOO_VALIDATION_ENDPOINT", DEFAULT_VALIDATION_ENDPOINT
         )
-        # base_url should be the full endpoint URL, not just base
         self.base_url = resolved_url.rstrip("/")
         self.timeout = timeout
         self.max_retries = max_retries
@@ -147,34 +129,13 @@ class ValidationAPIClient:
         return deduped
 
     def _request_with_retries(self, params: Dict[str, str]) -> httpx.Response:
-        """
-        Make HTTP request with retry logic and attempt logging.
-
-        Implements Issue #27: Retry logic with explicit attempt count logging.
-        - WAHOO API: up to 2 retries (3 total attempts) with exponential backoff
-        - All retry attempts are logged with attempt count and cause
-        - Retries respect the ~100s main loop duration budget
-        - Timeouts are hard failures (no retry)
-
-        Args:
-            params: Query parameters for the request
-
-        Returns:
-            httpx.Response: Successful response (status 200)
-
-        Raises:
-            ValidationAPIError: If all retries are exhausted or timeout occurs
-        """
-        # Use the endpoint from base_url (which comes from DEFAULT_VALIDATION_ENDPOINT)
-        # The base_url already includes the full path, so use it directly
         url = self.base_url
         attempt = 0
-        max_attempts = self.max_retries + 1  # Total attempts = retries + 1
+        max_attempts = self.max_retries + 1
 
         while attempt < max_attempts:
             attempt += 1
 
-            # Issue #27: Log every retry attempt with its cause and attempt count
             if attempt > 1:
                 bt.logging.info(
                     f"ValidationAPI retry attempt {attempt}/{max_attempts} "
@@ -184,8 +145,6 @@ class ValidationAPIClient:
             try:
                 response = self._session.get(url, params=params)
             except httpx.TimeoutException as exc:
-                # Timeout is a hard failure - don't retry, raise immediately
-                # Issue #27: Log timeout with attempt count
                 bt.logging.error(
                     f"ValidationAPI request timed out after {self.timeout}s "
                     f"(attempt {attempt}/{max_attempts}): {exc}"
@@ -194,7 +153,6 @@ class ValidationAPIClient:
                     f"Validation API request timed out after {self.timeout}s"
                 ) from exc
             except httpx.HTTPError as exc:
-                # Issue #27: Log HTTP error with attempt count
                 bt.logging.warning(
                     f"ValidationAPI request failed (attempt {attempt}/{max_attempts}): {exc}"
                 )
@@ -216,7 +174,6 @@ class ValidationAPIClient:
                 return response
 
             if response.status_code in RETRY_STATUS_CODES and attempt < max_attempts:
-                # Issue #27: Log retry with status code and attempt count
                 bt.logging.warning(
                     f"ValidationAPI transient error (status={response.status_code}, "
                     f"attempt {attempt}/{max_attempts}), retrying..."
@@ -267,27 +224,6 @@ def get_active_event_id(
     timeout: float = 10.0,
     default_event_id: str = "wahoo_test_event",
 ) -> str:
-    """
-    Get the active event ID from the WAHOO API.
-
-    Implements Issue #17: Timeout specifications.
-    Implements Issue #27: Retry logic (0 retries - single attempt with fallback).
-
-    Retry Strategy:
-    - Event ID fetch: 0 retries (single attempt only)
-    - Minimal retries because a default event is available
-    - On failure (timeout, network error, parsing error), falls back to default_event_id
-    - This ensures the main loop is not blocked by event ID fetch failures
-
-    Args:
-        api_base_url: Optional base URL for API (defaults to WAHOO_API_URL env var)
-        timeout: Timeout in seconds (default 10.0)
-        default_event_id: Fallback event ID if request fails (default "wahoo_test_event")
-
-    Returns:
-        str: Active event_id from API, or default_event_id on failure
-    """
-    # Determine API base URL
     if api_base_url:
         base_url = api_base_url.rstrip("/")
     else:
@@ -298,15 +234,12 @@ def get_active_event_id(
     events_url = f"{base_url}/events"
 
     try:
-        # Create client with 10s timeout (Issue #17)
         with httpx.Client(timeout=timeout) as client:
             response = client.get(events_url)
             response.raise_for_status()
 
-            # Parse response to extract active event_id
             data = response.json()
             if isinstance(data, dict):
-                # Try common response formats
                 event_id = (
                     data.get("active_event_id")
                     or data.get("event_id")
@@ -317,7 +250,6 @@ def get_active_event_id(
                     bt.logging.info(f"Retrieved active event_id: {event_id}")
                     return str(event_id)
 
-            # If we can't find event_id in response, log and fallback
             bt.logging.warning(
                 f"Could not extract event_id from response: {data}. "
                 f"Using default: {default_event_id}"
@@ -338,18 +270,13 @@ def get_active_event_id(
         return default_event_id
 
 
-# Type hint for ValidatorDB interface (for cache fallback)
 class ValidatorDBInterface:
-    """Interface for ValidatorDB caching operations."""
-
     def cache_validation_data(self, hotkey: str, data_dict: Dict[str, Any]) -> None:
-        """Store validation data for a hotkey in the cache."""
         raise NotImplementedError
 
     def get_cached_validation_data(
         self, hotkeys: Sequence[str], max_age_days: int = 7
     ) -> List[Dict[str, Any]]:
-        """Retrieve cached validation data for hotkeys."""
         raise NotImplementedError
 
 
@@ -364,39 +291,13 @@ def get_wahoo_validation_data(
     validator_db: Optional[ValidatorDBInterface] = None,
     client: Optional[ValidationAPIClient] = None,
 ) -> List[ValidationRecord]:
-    """
-    Fetch validation data from WAHOO API with batching support.
-
-    Implements Issue #13 (batching), Issue #17 (timeouts), and Issue #16 (fallback):
-    - Splits hotkeys into batches of max_per_batch (default 256)
-    - Sets 30s timeout for each batch httpx.get() call (Issue #17)
-    - Treats validation timeouts as hard failures and triggers cache fallback (Issue #17)
-    - Processes batches sequentially
-    - Stores results to ValidatorDB as batches complete
-    - Filters out records with empty metrics (Issue #16)
-
-    Args:
-        hotkeys: Sequence of hotkey strings to query
-        start_date: Optional start date in ISO-8601 format
-        end_date: Optional end date in ISO-8601 format
-        max_per_batch: Maximum number of hotkeys per batch (default 256)
-        batch_timeout: Timeout per batch in seconds (default 30.0, Issue #17)
-        api_base_url: Optional base URL (defaults to DEFAULT_VALIDATION_ENDPOINT)
-        validator_db: Optional ValidatorDB instance for caching and fallback
-        client: Optional ValidationAPIClient instance
-
-    Returns:
-        List of ValidationRecord objects with usable metrics from all successful batches
-    """
     if not hotkeys:
         return []
 
-    # Normalize and deduplicate hotkeys
     valid_hotkeys = list(dict.fromkeys(str(hk).strip() for hk in hotkeys if hk))
     if not valid_hotkeys:
         return []
 
-    # Determine endpoint and create client
     endpoint = (
         api_base_url.rstrip("/")
         if api_base_url
@@ -409,7 +310,6 @@ def get_wahoo_validation_data(
         client.base_url = endpoint
         client.timeout = batch_timeout
 
-    # Split into batches
     batches = [
         valid_hotkeys[i : i + max_per_batch]
         for i in range(0, len(valid_hotkeys), max_per_batch)
@@ -420,21 +320,18 @@ def get_wahoo_validation_data(
         f"(max {max_per_batch} per batch, {batch_timeout}s timeout)"
     )
 
-    # Process batches sequentially
     all_records: List[ValidationRecord] = []
     successful_batches = 0
     failed_batches = 0
 
     for batch_num, batch in enumerate(batches, 1):
         try:
-            # Fetch data for this batch (30s timeout per Issue #17)
             records = client.fetch_validation_data(
                 hotkeys=batch,
                 start_date=start_date,
                 end_date=end_date,
             )
 
-            # Store to ValidatorDB if enabled
             if validator_db is not None:
                 try:
                     for record in records:
@@ -451,7 +348,6 @@ def get_wahoo_validation_data(
             )
 
         except ValidationAPIError as e:
-            # Timeout or other API error - try cache fallback (Issue #17)
             bt.logging.warning(
                 f"Batch {batch_num}/{len(batches)} failed: {e}. "
                 "Attempting cache fallback..."
@@ -463,7 +359,6 @@ def get_wahoo_validation_data(
                         hotkeys=batch, max_age_days=7
                     )
                     if cached_data:
-                        # Convert cached dicts back to ValidationRecord objects
                         cached_records = []
                         for data_dict in cached_data:
                             try:
@@ -485,7 +380,6 @@ def get_wahoo_validation_data(
                         f"Cache fallback failed for batch {batch_num}: {cache_error}"
                     )
 
-            # No cache or cache failed - skip this batch
             bt.logging.warning(
                 f"Batch {batch_num}/{len(batches)} skipped (no cache available)"
             )
@@ -500,7 +394,6 @@ def get_wahoo_validation_data(
         f"{failed_batches} failed, {len(all_records)} total records"
     )
 
-    # Filter out records with empty metrics (Issue #16)
     usable_records = filter_usable_records(all_records)
     if len(usable_records) < len(all_records):
         excluded = len(all_records) - len(usable_records)
@@ -510,31 +403,3 @@ def get_wahoo_validation_data(
         )
 
     return usable_records
-
-
-# Note: Dendrite miner queries timeout specification (Issue #17)
-# When implementing dendrite.query() calls, use timeout=12.0s:
-#   dendrite.query(axons=axons, synapses=synapses, timeout=12.0)
-# This should be async as per "Miner Queries - timeout 12s, async"
-
-
-# Note: Main loop timing considerations (Issue #17)
-# The main loop should complete within ~100 seconds under worst-case scenarios:
-# - Metagraph sync: ~2-5s
-# - get_wahoo_validation_data: N batches * 30s timeout (worst case: all batches timeout)
-# - get_active_event_id: 10s timeout
-# - dendrite.query: 12s timeout
-# - Weight computation: ~1-2s
-# - set_weights: ~5-10s
-# - Cache cleanup: ~1-2s
-# Total worst-case: ~60-70s (with timeouts), well under 100s budget
-
-# Note: Cache cleanup integration (Issue #16)
-# When ValidatorDB class is implemented, integrate periodic cleanup into main loop:
-#   - Call validator_db.cleanup_old_cache(max_age_days=7) periodically (e.g., every 10 loops)
-#   - Run VACUUM periodically to keep database file size under control (e.g., every 50 loops)
-#   - Example:
-#       if loop_count % 10 == 0:
-#           validator_db.cleanup_old_cache(max_age_days=7)
-#       if loop_count % 50 == 0:
-#           validator_db.vacuum()  # or conn.execute("VACUUM")
