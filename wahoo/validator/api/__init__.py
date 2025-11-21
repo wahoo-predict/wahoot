@@ -1,5 +1,3 @@
-"""WAHOO API client for fetching validation data."""
-
 from .client import (
     DEFAULT_VALIDATION_ENDPOINT,
     EVENT_ID_MAX_RETRIES,

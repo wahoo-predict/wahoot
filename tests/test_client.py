@@ -9,7 +9,6 @@ from wahoo.validator.api.client import get_wahoo_validation_data
 
 
 def build_mock_client(responses: List[httpx.Response]) -> ValidationAPIClient:
-    """Utility to provide a ValidationAPIClient backed by predictable responses."""
     call_count = {"value": 0}
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -123,42 +122,26 @@ def test_fetch_validation_data_invalid_payload_raises():
 
 
 def test_get_wahoo_validation_data_batching():
-    """Test that get_wahoo_validation_data splits hotkeys into batches.
-
-    Note: This is a basic test. Full integration testing would require
-    mocking the httpx client properly, which is complex.
-    For now, we verify the function exists and handles edge cases.
-    """
-    # Test with empty hotkeys
     records = get_wahoo_validation_data(hotkeys=[])
     assert records == []
 
-    # Test that function is callable and accepts parameters
-    # Full mocking would require patching httpx.Client which is complex
-    # This test verifies the interface works
     assert callable(get_wahoo_validation_data)
 
 
 def test_get_wahoo_validation_data_empty_hotkeys():
-    """Test that get_wahoo_validation_data handles empty hotkeys gracefully."""
+
     records = get_wahoo_validation_data(hotkeys=[])
     assert records == []
 
 
 def test_get_wahoo_validation_data_handles_failures():
-    """Test that get_wahoo_validation_data handles failures gracefully."""
-    # Test with invalid hotkeys (empty strings get filtered)
     records = get_wahoo_validation_data(hotkeys=["", "  ", None])  # type: ignore
-    # Should return empty list after normalization
     assert isinstance(records, list)
 
 
 def test_get_wahoo_validation_data_batching_splits_correctly():
-    """Test that batching splits hotkeys into correct batch sizes."""
-    # Create 300 hotkeys to test batching (should create 2 batches: 256 + 44)
     hotkeys = [f"hotkey_{i:03d}" for i in range(300)]
 
-    # Create mock responses for 2 batches
     def create_batch_payload(batch_hotkeys):
         return {
             "data": [
@@ -173,16 +156,13 @@ def test_get_wahoo_validation_data_batching_splits_correctly():
             ]
         }
 
-    # Track which batches were called
     call_tracker = {"batches": []}
 
     def handler(request: httpx.Request) -> httpx.Response:
-        # Extract hotkeys from request params
         params = dict(request.url.params)
         batch_hotkeys = params.get("hotkeys", "").split(",")
         call_tracker["batches"].append(batch_hotkeys)
 
-        # Return appropriate payload for this batch
         payload = create_batch_payload(batch_hotkeys)
         return httpx.Response(200, json=payload)
 
@@ -195,24 +175,21 @@ def test_get_wahoo_validation_data_batching_splits_correctly():
         backoff_seconds=0.01,
     )
 
-    # Test with max_per_batch=256
     records = get_wahoo_validation_data(
         hotkeys=hotkeys,
         max_per_batch=256,
         client=client,
     )
 
-    # Should have 2 batches
     assert len(call_tracker["batches"]) == 2
     assert len(call_tracker["batches"][0]) == 256
     assert len(call_tracker["batches"][1]) == 44
 
-    # Should return all records
     assert len(records) == 300
 
 
 def test_get_wahoo_validation_data_handles_failed_batches():
-    """Test that failed batches don't block other batches."""
+
     hotkeys = [f"hotkey_{i}" for i in range(500)]  # 2 batches with 256
 
     call_count = {"value": 0}
@@ -220,20 +197,15 @@ def test_get_wahoo_validation_data_handles_failed_batches():
 
     def handler(request: httpx.Request) -> httpx.Response:
         call_count["value"] += 1
-        # Extract hotkeys from request to identify which batch
         params = dict(request.url.params)
         batch_hotkeys = params.get("hotkeys", "").split(",")
 
-        # Check if this is the first batch (256 hotkeys) or second batch (244 hotkeys)
         is_first_batch = len(batch_hotkeys) == 256
 
         if is_first_batch:
             first_batch_calls["value"] += 1
-            # First batch always fails (even on retry)
-            # With max_retries=1, we get 2 attempts for first batch
             return httpx.Response(500, json={"error": "server error"})
         else:
-            # Second batch succeeds
             return httpx.Response(
                 200,
                 json={
@@ -249,7 +221,7 @@ def test_get_wahoo_validation_data_handles_failed_batches():
     client = ValidationAPIClient(
         base_url="https://api.example.com",
         session=session,
-        max_retries=1,  # 2 total attempts (1 initial + 1 retry)
+        max_retries=1,
         backoff_seconds=0.01,
     )
 
@@ -259,20 +231,15 @@ def test_get_wahoo_validation_data_handles_failed_batches():
         client=client,
     )
 
-    # With max_retries=1, first batch gets 2 attempts (1 initial + 1 retry)
-    # Second batch gets 1 attempt
-    # Total: 3 calls (2 for first batch + 1 for second batch)
     assert call_count["value"] == 3
-    assert first_batch_calls["value"] == 2  # First batch attempted twice
-    # Should have records from second batch only (244 records: 500 - 256)
+    assert first_batch_calls["value"] == 2
     assert len(records) == 244
 
 
 def test_get_wahoo_validation_data_with_validator_db():
-    """Test that batching stores results to ValidatorDB as batches complete."""
+
     hotkeys = [f"hotkey_{i}" for i in range(100)]
 
-    # Mock ValidatorDB
     class MockValidatorDB:
         def __init__(self):
             self.cached_data = {}
@@ -284,7 +251,6 @@ def test_get_wahoo_validation_data_with_validator_db():
 
     mock_db = MockValidatorDB()
 
-    # Mock API responses
     def handler(request: httpx.Request) -> httpx.Response:
         params = dict(request.url.params)
         batch_hotkeys = params.get("hotkeys", "").split(",")
@@ -312,14 +278,13 @@ def test_get_wahoo_validation_data_with_validator_db():
         validator_db=mock_db,
     )
 
-    # Should have cached all records
     assert len(mock_db.cached_data) == 100
     assert len(mock_db.cache_calls) == 100
     assert len(records) == 100
 
 
 def test_get_wahoo_validation_data_deduplicates_hotkeys():
-    """Test that duplicate hotkeys are deduplicated before batching."""
+
     hotkeys = ["hotkey_1", "hotkey_2", "hotkey_1", "hotkey_3", "hotkey_2"]
 
     call_tracker = {"hotkeys_seen": set()}
@@ -351,7 +316,6 @@ def test_get_wahoo_validation_data_deduplicates_hotkeys():
         client=client,
     )
 
-    # Should only have 3 unique hotkeys
     assert len(call_tracker["hotkeys_seen"]) == 3
     assert len(records) == 3
     assert set(r.hotkey for r in records) == {"hotkey_1", "hotkey_2", "hotkey_3"}

@@ -1,12 +1,3 @@
-"""
-Fallback logic utilities for Issue #16: Cache check and empty data handling.
-
-This module provides utilities for:
-- Checking if validation data is usable (has non-empty metrics)
-- Determining if weight computation should be skipped
-- Logging empty data scenarios
-"""
-
 import logging
 from typing import List, Optional
 
@@ -16,26 +7,11 @@ logger = logging.getLogger(__name__)
 
 
 def has_usable_metrics(record: ValidationRecord) -> bool:
-    """
-    Check if a ValidationRecord has usable performance metrics.
-
-    A record is considered usable if it has at least one non-zero metric:
-    - total_volume_usd > 0
-    - realized_profit_usd is not None
-    - trade_count > 0
-
-    Args:
-        record: ValidationRecord to check
-
-    Returns:
-        bool: True if record has usable metrics, False otherwise
-    """
     if not record or not record.performance:
         return False
 
     perf = record.performance
 
-    # Check if at least one key metric is present and non-zero
     has_volume = perf.total_volume_usd is not None and perf.total_volume_usd > 0
     has_profit = perf.realized_profit_usd is not None
     has_trades = perf.trade_count is not None and perf.trade_count > 0
@@ -44,17 +20,6 @@ def has_usable_metrics(record: ValidationRecord) -> bool:
 
 
 def filter_usable_records(records: List[ValidationRecord]) -> List[ValidationRecord]:
-    """
-    Filter validation records to only include those with usable metrics.
-
-    Implements Issue #16: Exclude records with empty metrics.
-
-    Args:
-        records: List of ValidationRecord objects
-
-    Returns:
-        List[ValidationRecord]: Filtered list containing only records with usable metrics
-    """
     if not records:
         return []
 
@@ -75,19 +40,6 @@ def should_skip_weight_computation(
     *,
     log_reason: bool = True,
 ) -> bool:
-    """
-    Determine if weight computation should be skipped due to empty validation data.
-
-    Implements Issue #16: Skip weight computation if validation_data is empty
-    after API + cache fallback.
-
-    Args:
-        validation_data: List of ValidationRecord objects (may be None or empty)
-        log_reason: If True, log the reason for skipping
-
-    Returns:
-        bool: True if weight computation should be skipped, False otherwise
-    """
     if not validation_data or len(validation_data) == 0:
         if log_reason:
             logger.warning(
@@ -96,7 +48,6 @@ def should_skip_weight_computation(
             )
         return True
 
-    # Filter to only usable records
     usable_records = filter_usable_records(validation_data)
     if len(usable_records) == 0:
         if log_reason:

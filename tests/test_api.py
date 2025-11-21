@@ -1,10 +1,4 @@
 #!/usr/bin/env python3
-"""
-Quick test script to verify WAHOO API endpoints are working.
-
-This is a manual test script to verify the API endpoints are accessible
-and returning expected data structures. Run with: python tests/test_api.py
-"""
 
 import httpx
 import json
@@ -14,7 +8,6 @@ TEST_HOTKEY = "5G6HBuhKoYUjGvbcoa6X6Tm3q2jNFek1Ry78S8gKyY5HgiDj"
 
 
 def test_single_hotkey():
-    """Test API with a single hotkey."""
     print("=" * 60)
     print("Test 1: Single Hotkey")
     print("=" * 60)
@@ -37,7 +30,7 @@ def test_single_hotkey():
 
 
 def test_multiple_hotkeys():
-    """Test API with multiple hotkeys."""
+
     print("\n" + "=" * 60)
     print("Test 2: Multiple Hotkeys (including fake)")
     print("=" * 60)
@@ -60,14 +53,13 @@ def test_multiple_hotkeys():
 
 
 def test_with_dates():
-    """Test API with date range."""
+
     print("\n" + "=" * 60)
     print("Test 3: With Date Range")
     print("=" * 60)
 
     url = f"{API_BASE_URL}/api/v2/event/bittensor/statistics"
 
-    # Date range from the example
     start_date = "2025-10-10T12:11:08.566Z"
     end_date = "2025-11-30T12:11:08.566Z"
 
@@ -92,7 +84,7 @@ def test_with_dates():
 
 
 def test_response_structure():
-    """Analyze the response structure."""
+
     print("\n" + "=" * 60)
     print("Test 4: Response Structure Analysis")
     print("=" * 60)

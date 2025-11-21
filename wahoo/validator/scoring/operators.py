@@ -8,10 +8,6 @@ import pandas as pd
 
 from ..dataframe import ensure_required_columns
 
-# This file is where we will implement and define the scoring functions
-# These are fed into the general scoring pipeline
-# TODO: reconsider requiring a sum(scores) == 1 on the operators themselves
-
 
 @dataclass(frozen=True)
 class OperatorResult:
@@ -37,17 +33,7 @@ class Operator(ABC):
         raise NotImplementedError
 
 
-# TODO actually implement the scoring system
-# TODO implement simple backups incase exploits break scoring
-# TODO wire in with db operations - dereg
 class VolumeProfitOperator(Operator):
-    """
-    This one is a example/temp scoring func:
-    - Filters out miners with non-positive realized profit.
-    - Weights proportional to realized profit * total volume.
-    - Normalizes to probability vector over available miners.
-    """
-
     name = "volume_profit"
     required_columns = ("hotkey", "total_volume_usd", "realized_profit_usd")
 

@@ -1,7 +1,3 @@
-"""
-Pytest configuration and shared fixtures for validator tests.
-"""
-
 import pytest
 import tempfile
 from pathlib import Path
@@ -12,18 +8,15 @@ import bittensor as bt
 
 @pytest.fixture
 def temp_db_path():
-    """Create a temporary database path for testing."""
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
         db_path = Path(f.name)
     yield db_path
-    # Cleanup
     if db_path.exists():
         db_path.unlink()
 
 
 @pytest.fixture
 def mock_metagraph():
-    """Create a mock metagraph for testing."""
     metagraph = Mock(spec=bt.Metagraph)
     metagraph.uids = torch.tensor([0, 1, 2, 3, 4])
     metagraph.axons = [
@@ -45,7 +38,7 @@ def mock_metagraph():
 
 @pytest.fixture
 def mock_wallet():
-    """Create a mock wallet for testing."""
+
     wallet = Mock(spec=bt.Wallet)
     wallet.name = "test_wallet"
     wallet.hotkey = Mock()
@@ -54,7 +47,7 @@ def mock_wallet():
 
 @pytest.fixture
 def mock_subtensor():
-    """Create a mock subtensor for testing."""
+
     subtensor = Mock(spec=bt.Subtensor)
     subtensor.network = "local"
     return subtensor
@@ -62,13 +55,13 @@ def mock_subtensor():
 
 @pytest.fixture
 def mock_dendrite():
-    """Create a mock dendrite for testing."""
+
     return Mock(spec=bt.Dendrite)
 
 
 @pytest.fixture
 def test_config():
-    """Create test configuration."""
+
     return {
         "netuid": 1,
         "network": "local",
