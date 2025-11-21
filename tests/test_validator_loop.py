@@ -18,8 +18,32 @@ import bittensor as bt
 from wahoo.validator.validator import (
     main_loop_iteration,
 )
-from wahoo.validator.mock_data import generate_mock_validation_data
+from wahoo.validator.models import ValidationRecord, PerformanceMetrics
 from wahoo.protocol.protocol import WAHOOPredict
+
+
+def generate_mock_validation_data(hotkeys):
+    """Generate mock validation data for testing."""
+    import random
+
+    records = []
+    for hotkey in hotkeys:
+        performance = PerformanceMetrics(
+            total_volume_usd=random.uniform(100.0, 20000.0),
+            realized_profit_usd=random.uniform(-2000.0, 2000.0),
+            unrealized_profit_usd=random.uniform(-100.0, 800.0),
+            trade_count=random.randint(10, 800),
+            open_positions_count=random.randint(0, 50),
+            win_rate=random.uniform(0.3, 0.8) if random.random() > 0.3 else None,
+        )
+        record = ValidationRecord(
+            hotkey=hotkey,
+            signature=f"sig_{random.randint(1000, 9999)}",
+            message=f"msg_{random.randint(1000, 9999)}",
+            performance=performance,
+        )
+        records.append(record)
+    return records
 
 
 class TestValidatorLoop:
