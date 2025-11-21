@@ -5,10 +5,7 @@ These tests simulate the full validator pipeline with mock data
 to ensure all components work together correctly.
 """
 
-import os
-import tempfile
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 import pytest
 import torch
 
@@ -16,14 +13,10 @@ import bittensor as bt
 
 from wahoo.validator.validator import (
     main_loop_iteration,
-    initialize_bittensor,
-    load_validator_config,
 )
 from wahoo.validator.mock_data import (
     generate_mock_validation_data,
-    create_mock_miner_responses,
 )
-from wahoo.validator.models import ValidationRecord
 from wahoo.protocol.protocol import WAHOOPredict
 
 
@@ -37,7 +30,7 @@ class TestValidatorIntegration:
         subtensor = Mock(spec=bt.Subtensor)
         dendrite = Mock(spec=bt.Dendrite)
         metagraph = Mock(spec=bt.Metagraph)
-        
+
         # Setup metagraph
         metagraph.uids = torch.tensor([0, 1, 2])
         metagraph.axons = [
@@ -50,7 +43,7 @@ class TestValidatorIntegration:
             "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
             "5GNJqTPyNqANBkUVMN1LPPrxXnFouWXoe2wNSmmEoLctxiZY",
         ]
-        
+
         return wallet, subtensor, dendrite, metagraph
 
     @pytest.fixture
@@ -86,11 +79,11 @@ class TestValidatorIntegration:
     ):
         """Test successful full pipeline execution."""
         wallet, subtensor, dendrite, metagraph = mock_components
-        
+
         # Setup mocks
         active_uids = [0, 1, 2]
         mock_get_active_uids.return_value = active_uids
-        
+
         hotkeys = [
             "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty",
             "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
@@ -98,14 +91,14 @@ class TestValidatorIntegration:
         ]
         uid_to_hotkey = dict(zip(active_uids, hotkeys))
         mock_build_uid_to_hotkey.return_value = uid_to_hotkey
-        
+
         # Mock validation data
         mock_validation_data = generate_mock_validation_data(hotkeys)
         mock_get_validation_data.return_value = mock_validation_data
-        
+
         # Mock event ID
         mock_get_event_id.return_value = "test_event_123"
-        
+
         # Mock dendrite responses
         mock_responses = [
             WAHOOPredict(event_id="test_event_123", prob_yes=0.7, prob_no=0.3, confidence=0.8),
@@ -113,14 +106,14 @@ class TestValidatorIntegration:
             WAHOOPredict(event_id="test_event_123", prob_yes=0.5, prob_no=0.5, confidence=0.6),
         ]
         dendrite.query.return_value = mock_responses
-        
+
         # Mock rewards
         mock_rewards = torch.tensor([0.4, 0.3, 0.3])
         mock_reward.return_value = mock_rewards
-        
+
         # Mock set_weights
         mock_set_weights.return_value = ("tx_hash_123", True)
-        
+
         # Run iteration
         main_loop_iteration(
             wallet=wallet,
@@ -131,7 +124,7 @@ class TestValidatorIntegration:
             config=config,
             validator_db=None,
         )
-        
+
         # Verify all steps executed
         mock_get_active_uids.assert_called_once()
         mock_build_uid_to_hotkey.assert_called_once()
@@ -154,12 +147,12 @@ class TestValidatorIntegration:
     ):
         """Test pipeline when validation data is empty."""
         wallet, subtensor, dendrite, metagraph = mock_components
-        
+
         active_uids = [0, 1]
         mock_get_active_uids.return_value = active_uids
         mock_build_uid_to_hotkey.return_value = {0: "hotkey1", 1: "hotkey2"}
         mock_get_validation_data.return_value = []  # Empty data
-        
+
         # Should handle gracefully
         main_loop_iteration(
             wallet=wallet,
@@ -170,7 +163,7 @@ class TestValidatorIntegration:
             config=config,
             validator_db=None,
         )
-        
+
         # Should have attempted to fetch data
         mock_get_validation_data.assert_called_once()
 
@@ -187,16 +180,16 @@ class TestValidatorIntegration:
     ):
         """Test pipeline when only some miners have validation data."""
         wallet, subtensor, dendrite, metagraph = mock_components
-        
+
         active_uids = [0, 1, 2]
         hotkeys = ["hotkey1", "hotkey2", "hotkey3"]
         mock_get_active_uids.return_value = active_uids
         mock_build_uid_to_hotkey.return_value = dict(zip(active_uids, hotkeys))
-        
+
         # Only first two miners have data
         mock_validation_data = generate_mock_validation_data(hotkeys[:2])
         mock_get_validation_data.return_value = mock_validation_data
-        
+
         # Should handle partial data
         main_loop_iteration(
             wallet=wallet,
@@ -207,7 +200,7 @@ class TestValidatorIntegration:
             config=config,
             validator_db=None,
         )
-        
+
         mock_get_validation_data.assert_called_once()
 
 
@@ -226,7 +219,7 @@ class TestValidatorEdgeCases:
     ):
         """Test when no active miners are found."""
         mock_get_active_uids.return_value = []
-        
+
         # Should return early without errors
         main_loop_iteration(
             wallet=mock_wallet,
@@ -237,7 +230,7 @@ class TestValidatorEdgeCases:
             config=test_config,
             validator_db=None,
         )
-        
+
         mock_get_active_uids.assert_called_once()
 
     @patch("wahoo.validator.validator.get_wahoo_validation_data")
@@ -255,15 +248,15 @@ class TestValidatorEdgeCases:
         test_config,
     ):
         """Test handling of API timeout."""
-        
+
         active_uids = [0, 1]
         mock_get_active_uids.return_value = active_uids
         mock_build_uid_to_hotkey.return_value = {0: "hotkey1", 1: "hotkey2"}
-        
+
         # Simulate timeout
         from wahoo.validator.api.client import ValidationAPIError
         mock_get_validation_data.side_effect = ValidationAPIError("Request timed out")
-        
+
         # Should handle gracefully
         main_loop_iteration(
             wallet=mock_wallet,
@@ -294,16 +287,16 @@ class TestValidatorEdgeCases:
         test_config,
     ):
         """Test handling of set_weights failure."""
-        
+
         active_uids = [0]
         mock_get_active_uids.return_value = active_uids
         mock_build_uid_to_hotkey.return_value = {0: "hotkey1"}
         mock_get_validation_data.return_value = []
         mock_reward.return_value = torch.tensor([1.0])
-        
+
         # set_weights fails
         mock_set_weights.return_value = (None, False)
-        
+
         # Should handle gracefully
         main_loop_iteration(
             wallet=mock_wallet,
@@ -314,6 +307,5 @@ class TestValidatorEdgeCases:
             config=test_config,
             validator_db=None,
         )
-        
-        mock_set_weights.assert_called_once()
 
+        mock_set_weights.assert_called_once()
