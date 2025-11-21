@@ -1,0 +1,1 @@
+"""WaHoo Predict Miner implementation."""

@@ -71,3 +71,6 @@ htmlcov/
 .wallet/
 *.coldkey
 *.hotkey
+
+# Localnet testing wallets
+.wallets/
