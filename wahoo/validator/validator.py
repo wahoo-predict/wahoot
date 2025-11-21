@@ -355,7 +355,8 @@ def main_loop_iteration(
 
         # Step 2: Get active UIDs
         logger.info("[2/9] Getting active UIDs...")
-        active_uids = get_active_uids(metagraph)
+        # Pass network to get_active_uids so it can detect localnet and return all UIDs
+        active_uids = get_active_uids(metagraph, network=config.get("network"))
         if not active_uids:
             logger.warning("No active UIDs found, skipping iteration")
             return

@@ -21,7 +21,13 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Store of "registered" miners (simulates miners that registered on subnet)
+# Updated with real localnet hotkeys for testing
 REGISTERED_MINERS = {
+    # Real localnet miners (subnet 2)
+    "5FWfRMp4uy63xEphWhsJGyqMyE2mNXLuYjzQsmUfhLzAJDhX": True,  # UID 0
+    "5H3fM5D54iXoGuw7TZiVRQeRF8pA1xiQT9MXzpgNy7gvXk4k": True,  # UID 1
+    "5EZ3Q91mFT8eRT6innXB8JVV8PLjvW8uDF85P6sF34WdxQwF": True,  # UID 2
+    # Keep old examples for backward compatibility
     "5Dnh2o9x9kTRtfeF5g3W4uzfzWNeGD1EJo4aCtibAESzP2iE": True,
     "5FddqPQUhEFeLqVNbenAj6EDRKuqgezciN9TmTgBmNABsj53": True,
     "5E2WWRc41ekrak33NjqZZ338s2sEX5rLCnZXEGKfD52PMqod": True,
