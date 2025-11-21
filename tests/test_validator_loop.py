@@ -148,10 +148,16 @@ class TestValidatorLoop:
 
         # Mock dendrite query responses
         mock_responses = [
-            WAHOOPredict(event_id="test_event_123", prob_yes=0.7, prob_no=0.3, confidence=0.8),
-            WAHOOPredict(event_id="test_event_123", prob_yes=0.6, prob_no=0.4, confidence=0.7),
+            WAHOOPredict(
+                event_id="test_event_123", prob_yes=0.7, prob_no=0.3, confidence=0.8
+            ),
+            WAHOOPredict(
+                event_id="test_event_123", prob_yes=0.6, prob_no=0.4, confidence=0.7
+            ),
             None,  # Timeout/failure
-            WAHOOPredict(event_id="test_event_123", prob_yes=0.5, prob_no=0.5, confidence=0.6),
+            WAHOOPredict(
+                event_id="test_event_123", prob_yes=0.5, prob_no=0.5, confidence=0.6
+            ),
         ]
         mock_dendrite.query.return_value = mock_responses
 
@@ -177,7 +183,9 @@ class TestValidatorLoop:
 
         # Verify calls
         mock_get_active_uids.assert_called_once_with(mock_metagraph)
-        mock_build_uid_to_hotkey.assert_called_once_with(mock_metagraph, active_uids=active_uids)
+        mock_build_uid_to_hotkey.assert_called_once_with(
+            mock_metagraph, active_uids=active_uids
+        )
         mock_get_validation_data.assert_called_once()
         mock_get_event_id.assert_called_once()
         mock_dendrite.query.assert_called_once()
@@ -275,7 +283,9 @@ class TestValidatorLoop:
         mock_reward.return_value = torch.tensor([0.0, 0.0])
 
         # Should skip set_weights
-        with patch("wahoo.validator.validator.set_weights_with_retry") as mock_set_weights:
+        with patch(
+            "wahoo.validator.validator.set_weights_with_retry"
+        ) as mock_set_weights:
             main_loop_iteration(
                 wallet=mock_wallet,
                 subtensor=mock_subtensor,
@@ -404,11 +414,15 @@ class TestValidatorIntegration:
         mock_subtensor = Mock()
         mock_dendrite = Mock()
         mock_metagraph = Mock()
-        mock_metagraph.uids = torch.tensor(active_uids)  # Must be torch tensor for len()
+        mock_metagraph.uids = torch.tensor(
+            active_uids
+        )  # Must be torch tensor for len()
         mock_metagraph.axons = [Mock() for _ in active_uids]
 
         mock_responses = [
-            WAHOOPredict(event_id="test_event", prob_yes=0.7, prob_no=0.3, confidence=0.8)
+            WAHOOPredict(
+                event_id="test_event", prob_yes=0.7, prob_no=0.3, confidence=0.8
+            )
             for _ in active_uids
         ]
         mock_dendrite.query.return_value = mock_responses
@@ -418,8 +432,13 @@ class TestValidatorIntegration:
             "wahoo_api_url": "https://api.wahoopredict.com",
         }
 
-        with patch("wahoo.validator.validator.get_active_uids", return_value=active_uids):
-            with patch("wahoo.validator.validator.build_uid_to_hotkey", return_value=dict(zip(active_uids, hotkeys))):
+        with patch(
+            "wahoo.validator.validator.get_active_uids", return_value=active_uids
+        ):
+            with patch(
+                "wahoo.validator.validator.build_uid_to_hotkey",
+                return_value=dict(zip(active_uids, hotkeys)),
+            ):
                 main_loop_iteration(
                     wallet=mock_wallet,
                     subtensor=mock_subtensor,

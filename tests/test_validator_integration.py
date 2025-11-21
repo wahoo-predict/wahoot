@@ -123,9 +123,15 @@ class TestValidatorIntegration:
 
         # Mock dendrite responses
         mock_responses = [
-            WAHOOPredict(event_id="test_event_123", prob_yes=0.7, prob_no=0.3, confidence=0.8),
-            WAHOOPredict(event_id="test_event_123", prob_yes=0.6, prob_no=0.4, confidence=0.7),
-            WAHOOPredict(event_id="test_event_123", prob_yes=0.5, prob_no=0.5, confidence=0.6),
+            WAHOOPredict(
+                event_id="test_event_123", prob_yes=0.7, prob_no=0.3, confidence=0.8
+            ),
+            WAHOOPredict(
+                event_id="test_event_123", prob_yes=0.6, prob_no=0.4, confidence=0.7
+            ),
+            WAHOOPredict(
+                event_id="test_event_123", prob_yes=0.5, prob_no=0.5, confidence=0.6
+            ),
         ]
         dendrite.query.return_value = mock_responses
 
@@ -277,6 +283,7 @@ class TestValidatorEdgeCases:
 
         # Simulate timeout
         from wahoo.validator.api.client import ValidationAPIError
+
         mock_get_validation_data.side_effect = ValidationAPIError("Request timed out")
 
         # Should handle gracefully

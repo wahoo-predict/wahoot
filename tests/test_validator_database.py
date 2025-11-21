@@ -65,13 +65,15 @@ class TestDatabaseOperations:
         cursor = conn.cursor()
 
         # Create validation_cache table if it doesn't exist
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS validation_cache (
                 hotkey TEXT PRIMARY KEY,
                 data_json TEXT NOT NULL,
                 timestamp TEXT NOT NULL
             )
-        """)
+        """
+        )
 
         # Create test data
         hotkey = "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty"
@@ -85,17 +87,23 @@ class TestDatabaseOperations:
         timestamp = datetime.now(timezone.utc).isoformat() + "Z"
 
         # Insert cache entry
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT OR REPLACE INTO validation_cache (hotkey, data_json, timestamp)
             VALUES (?, ?, ?)
-        """, (hotkey, data_json, timestamp))
+        """,
+            (hotkey, data_json, timestamp),
+        )
         conn.commit()
 
         # Retrieve cache entry
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT data_json, timestamp FROM validation_cache
             WHERE hotkey = ?
-        """, (hotkey,))
+        """,
+            (hotkey,),
+        )
         row = cursor.fetchone()
 
         assert row is not None
@@ -111,13 +119,15 @@ class TestDatabaseOperations:
         cursor = conn.cursor()
 
         # Create validation_cache table
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS validation_cache (
                 hotkey TEXT PRIMARY KEY,
                 data_json TEXT NOT NULL,
                 timestamp TEXT NOT NULL
             )
-        """)
+        """
+        )
 
         # Insert multiple cache entries
         hotkeys = [
@@ -134,20 +144,28 @@ class TestDatabaseOperations:
             data_json = json.dumps(test_data)
             timestamp = (now - timedelta(days=i)).isoformat() + "Z"
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT OR REPLACE INTO validation_cache (hotkey, data_json, timestamp)
                 VALUES (?, ?, ?)
-            """, (hotkey, data_json, timestamp))
+            """,
+                (hotkey, data_json, timestamp),
+            )
 
         conn.commit()
 
         # Retrieve cached data (within 7 days)
         seven_days_ago = (now - timedelta(days=7)).isoformat() + "Z"
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT hotkey, data_json FROM validation_cache
             WHERE hotkey IN ({})
             AND timestamp > ?
-        """.format(",".join("?" * len(hotkeys))), hotkeys + [seven_days_ago])
+        """.format(
+                ",".join("?" * len(hotkeys))
+            ),
+            hotkeys + [seven_days_ago],
+        )
 
         rows = cursor.fetchall()
         assert len(rows) == 2
@@ -160,13 +178,15 @@ class TestDatabaseOperations:
         cursor = conn.cursor()
 
         # Create validation_cache table
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS validation_cache (
                 hotkey TEXT PRIMARY KEY,
                 data_json TEXT NOT NULL,
                 timestamp TEXT NOT NULL
             )
-        """)
+        """
+        )
 
         # Insert old and new cache entries
         now = datetime.now(timezone.utc)
@@ -174,27 +194,36 @@ class TestDatabaseOperations:
         # Old entry (8 days ago)
         old_hotkey = "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty"
         old_timestamp = (now - timedelta(days=8)).isoformat() + "Z"
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO validation_cache (hotkey, data_json, timestamp)
             VALUES (?, ?, ?)
-        """, (old_hotkey, json.dumps({"hotkey": old_hotkey}), old_timestamp))
+        """,
+            (old_hotkey, json.dumps({"hotkey": old_hotkey}), old_timestamp),
+        )
 
         # New entry (1 day ago)
         new_hotkey = "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
         new_timestamp = (now - timedelta(days=1)).isoformat() + "Z"
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO validation_cache (hotkey, data_json, timestamp)
             VALUES (?, ?, ?)
-        """, (new_hotkey, json.dumps({"hotkey": new_hotkey}), new_timestamp))
+        """,
+            (new_hotkey, json.dumps({"hotkey": new_hotkey}), new_timestamp),
+        )
 
         conn.commit()
 
         # Cleanup entries older than 7 days
         seven_days_ago = (now - timedelta(days=7)).isoformat() + "Z"
-        cursor.execute("""
+        cursor.execute(
+            """
             DELETE FROM validation_cache
             WHERE timestamp < ?
-        """, (seven_days_ago,))
+        """,
+            (seven_days_ago,),
+        )
         conn.commit()
 
         # Verify old entry is deleted, new entry remains
@@ -212,12 +241,14 @@ class TestDatabaseOperations:
 
         # Insert and delete data to create fragmentation
         cursor = conn.cursor()
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS test_table (
                 id INTEGER PRIMARY KEY,
                 data TEXT
             )
-        """)
+        """
+        )
 
         # Insert data
         for i in range(100):
@@ -249,31 +280,39 @@ class TestDatabaseOperations:
         cursor = conn.cursor()
 
         # Create hotkeys table if it doesn't exist
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS hotkeys (
                 hotkey TEXT PRIMARY KEY,
                 first_seen TEXT NOT NULL,
                 last_seen TEXT NOT NULL
             )
-        """)
+        """
+        )
 
         hotkey = "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty"
         now = datetime.now(timezone.utc).isoformat() + "Z"
 
         # Insert new hotkey
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT OR IGNORE INTO hotkeys (hotkey, first_seen, last_seen)
             VALUES (?, ?, ?)
-        """, (hotkey, now, now))
+        """,
+            (hotkey, now, now),
+        )
         conn.commit()
 
         # Update last_seen
         new_time = datetime.now(timezone.utc).isoformat() + "Z"
-        cursor.execute("""
+        cursor.execute(
+            """
             UPDATE hotkeys
             SET last_seen = ?
             WHERE hotkey = ?
-        """, (new_time, hotkey))
+        """,
+            (new_time, hotkey),
+        )
         conn.commit()
 
         # Verify update
@@ -302,26 +341,34 @@ class TestDatabasePerformance:
         conn = get_or_create_database(temp_db_path)
         cursor = conn.cursor()
 
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS validation_cache (
                 hotkey TEXT PRIMARY KEY,
                 data_json TEXT NOT NULL,
                 timestamp TEXT NOT NULL
             )
-        """)
+        """
+        )
 
         # Insert 1000 entries
         import time
+
         start = time.time()
 
-        hotkeys = [f"5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694t{i}" for i in range(1000)]
+        hotkeys = [
+            f"5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694t{i}" for i in range(1000)
+        ]
         now = datetime.now(timezone.utc).isoformat() + "Z"
 
         for hotkey in hotkeys:
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO validation_cache (hotkey, data_json, timestamp)
                 VALUES (?, ?, ?)
-            """, (hotkey, json.dumps({"hotkey": hotkey}), now))
+            """,
+                (hotkey, json.dumps({"hotkey": hotkey}), now),
+            )
 
         conn.commit()
         elapsed = time.time() - start
@@ -336,42 +383,55 @@ class TestDatabasePerformance:
         conn = get_or_create_database(temp_db_path)
         cursor = conn.cursor()
 
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS validation_cache (
                 hotkey TEXT PRIMARY KEY,
                 data_json TEXT NOT NULL,
                 timestamp TEXT NOT NULL
             )
-        """)
+        """
+        )
 
         # Create index
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE INDEX IF NOT EXISTS idx_validation_cache_timestamp
             ON validation_cache(timestamp)
-        """)
+        """
+        )
 
         # Insert test data
-        hotkeys = [f"5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694t{i}" for i in range(100)]
+        hotkeys = [
+            f"5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694t{i}" for i in range(100)
+        ]
         now = datetime.now(timezone.utc)
 
         for i, hotkey in enumerate(hotkeys):
             timestamp = (now - timedelta(days=i % 10)).isoformat() + "Z"
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO validation_cache (hotkey, data_json, timestamp)
                 VALUES (?, ?, ?)
-            """, (hotkey, json.dumps({"hotkey": hotkey}), timestamp))
+            """,
+                (hotkey, json.dumps({"hotkey": hotkey}), timestamp),
+            )
 
         conn.commit()
 
         # Query with timestamp filter
         import time
+
         start = time.time()
 
         seven_days_ago = (now - timedelta(days=7)).isoformat() + "Z"
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT hotkey FROM validation_cache
             WHERE timestamp > ?
-        """, (seven_days_ago,))
+        """,
+            (seven_days_ago,),
+        )
 
         results = cursor.fetchall()
         elapsed = time.time() - start
