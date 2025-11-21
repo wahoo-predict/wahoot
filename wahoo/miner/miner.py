@@ -165,7 +165,7 @@ def main():
     wallet_name = os.getenv("WALLET_NAME", "default")
     hotkey_name = os.getenv("HOTKEY_NAME", "default")
     netuid = int(os.getenv("NETUID", "1"))
-    network = os.getenv("NETWORK", "local")
+    network = os.getenv("NETWORK", "finney")
     
     # Create and run miner
     miner = Miner(

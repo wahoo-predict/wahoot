@@ -13,7 +13,7 @@ from typing import Dict, List, Optional, Any
 logger = logging.getLogger(__name__)
 
 
-def get_active_uids(metagraph: Any, network: Optional[str] = None) -> List[int]:
+def get_active_uids(metagraph: Any) -> List[int]:
     """
     Get list of active UIDs from metagraph.
 
@@ -21,13 +21,8 @@ def get_active_uids(metagraph: Any, network: Optional[str] = None) -> List[int]:
     - axon.ip != "0.0.0.0" (not default/invalid IP)
     - axon.port > 0 (valid port number)
 
-    For localnet testing (ws://127.0.0.1:9945), returns ALL registered UIDs
-    regardless of axon status, since miners on localnet typically don't run
-    code and thus don't have active axons.
-
     Args:
         metagraph: Bittensor metagraph object
-        network: Optional network string. If contains "127.0.0.1:9945", returns all UIDs
 
     Returns:
         List[int]: List of active UID integers
@@ -35,23 +30,6 @@ def get_active_uids(metagraph: Any, network: Optional[str] = None) -> List[int]:
     active_uids: List[int] = []
 
     try:
-        # For localnet, return all registered UIDs (miners don't run code, so no active axons)
-        if network and "127.0.0.1:9945" in network:
-            if hasattr(metagraph, "hotkeys"):
-                all_uids = list(range(len(metagraph.hotkeys)))
-                logger.info(
-                    f"Localnet detected: Returning all {len(all_uids)} registered UIDs "
-                    "(axon check bypassed for localnet testing)"
-                )
-                return all_uids
-            elif hasattr(metagraph, "axons"):
-                all_uids = list(range(len(metagraph.axons)))
-                logger.info(
-                    f"Localnet detected: Returning all {len(all_uids)} registered UIDs "
-                    "(axon check bypassed for localnet testing)"
-                )
-                return all_uids
-
         if not hasattr(metagraph, "axons"):
             logger.warning("Metagraph does not have 'axons' attribute")
             return active_uids

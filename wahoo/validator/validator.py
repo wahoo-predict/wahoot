@@ -10,10 +10,8 @@ import logging
 import os
 import time
 from typing import Dict, List, Optional, Any
-from unittest.mock import Mock
 
 import bittensor as bt
-import torch
 from dotenv import load_dotenv
 
 from .api import get_active_event_id, get_wahoo_validation_data
@@ -37,7 +35,7 @@ def load_validator_config() -> Dict[str, Any]:
     """
     return {
         "netuid": int(os.getenv("NETUID", "0")),
-        "network": os.getenv("NETWORK", "finney"),
+        "network": os.getenv("NETWORK", "finney"),  # Default to mainnet
         "wallet_name": os.getenv("WALLET_NAME", "default"),
         "hotkey_name": os.getenv("HOTKEY_NAME", "default"),
         "loop_interval": float(os.getenv("LOOP_INTERVAL", "100.0")),
@@ -50,63 +48,6 @@ def load_validator_config() -> Dict[str, Any]:
             "https://api.wahoopredict.com/api/v2/event/bittensor/statistics",
         ),
     }
-
-
-def initialize_bittensor_mock(
-    netuid: int,
-) -> tuple[bt.Wallet, bt.Subtensor, bt.Dendrite, bt.Metagraph]:
-    """
-    Initialize mock Bittensor components for simulation/testing.
-
-    Args:
-        netuid: Subnet UID
-
-    Returns:
-        Tuple of (wallet, subtensor, dendrite, metagraph) - all mocked
-    """
-    logger.info("Initializing MOCK Bittensor components (simulation mode)...")
-
-    # Mock wallet
-    wallet = Mock(spec=bt.Wallet)
-    wallet.name = "mock_wallet"
-    wallet.hotkey = Mock()
-    logger.info("Mock wallet created")
-
-    # Mock subtensor
-    subtensor = Mock(spec=bt.Subtensor)
-    subtensor.network = "mock"
-    # Mock set_weights to return a transaction hash string (what the code expects)
-    def mock_set_weights(*args, **kwargs):
-        return "mock_tx_hash_12345"  # Return string (transaction hash)
-    subtensor.set_weights = Mock(side_effect=mock_set_weights)
-    logger.info("Mock subtensor created")
-
-    # Mock dendrite
-    dendrite = Mock(spec=bt.Dendrite)
-    logger.info("Mock dendrite created")
-
-    # Mock metagraph with registered miners (from mock API)
-    # These hotkeys match the ones in mock_api_server.py
-    mock_hotkeys = [
-        "5Dnh2o9x9kTRtfeF5g3W4uzfzWNeGD1EJo4aCtibAESzP2iE",
-        "5FddqPQUhEFeLqVNbenAj6EDRKuqgezciN9TmTgBmNABsj53",
-        "5E2WWRc41ekrak33NjqZZ338s2sEX5rLCnZXEGKfD52PMqod",
-        "5EaNWwsjZpoM6RDwgKoukSHJZ2yyEHmGGXogRejdBwCNV9SP",
-        "5De1Fkvq9g4idEzvr8h8WEEQa1xAeaXfA2TZfYMKgdMm4Qai",
-    ]
-    
-    metagraph = Mock(spec=bt.Metagraph)
-    metagraph.uids = torch.tensor(list(range(len(mock_hotkeys))))
-    metagraph.axons = [Mock(ip="127.0.0.1", port=8091 + i) for i in range(len(mock_hotkeys))]
-    metagraph.hotkeys = mock_hotkeys
-    metagraph.netuid = netuid
-    # Mock sync method to return self (no-op in mock mode)
-    metagraph.sync = Mock(return_value=metagraph)
-    
-    logger.info(f"Mock metagraph created: {len(metagraph.uids)} UIDs on subnet {netuid}")
-    logger.warning("⚠️  Running in MOCK mode - no real blockchain connection!")
-
-    return wallet, subtensor, dendrite, metagraph
 
 
 def initialize_bittensor(
@@ -219,17 +160,7 @@ def query_miners(
     )
     
     # Get axons for active UIDs
-    # Handle both real metagraph and mock metagraph
-    if isinstance(metagraph.axons, list):
-        axons = [metagraph.axons[uid] for uid in active_uids]
-    else:
-        # Mock metagraph - axons might be a Mock object
-        # Try to access as list, fallback to empty list
-        try:
-            axons = [metagraph.axons[uid] for uid in active_uids]
-        except (TypeError, IndexError):
-            logger.warning("Could not extract axons from metagraph (mock mode), using empty list")
-            axons = []
+    axons = [metagraph.axons[uid] for uid in active_uids]
     
     # Create synapses with event_id
     synapses = [WAHOOPredict(event_id=event_id) for _ in active_uids]
@@ -355,8 +286,7 @@ def main_loop_iteration(
 
         # Step 2: Get active UIDs
         logger.info("[2/9] Getting active UIDs...")
-        # Pass network to get_active_uids so it can detect localnet and return all UIDs
-        active_uids = get_active_uids(metagraph, network=config.get("network"))
+        active_uids = get_active_uids(metagraph)
         if not active_uids:
             logger.warning("No active UIDs found, skipping iteration")
             return
@@ -498,8 +428,8 @@ def main() -> None:
     parser.add_argument(
         "--network",
         type=str,
-        default=os.getenv("NETWORK", "local"),
-        choices=["local", "test", "finney"],
+        default=os.getenv("NETWORK", "finney"),
+        choices=["test", "finney"],
         help="Bittensor network",
     )
     
@@ -571,15 +501,6 @@ def main() -> None:
         help="Logging level",
     )
     
-    # Simulation/Mock mode
-    parser.add_argument(
-        "--mock",
-        action="store_true",
-        default=os.getenv("MOCK_MODE", "false").lower() == "true",
-        dest="mock_mode",
-        help="Run in mock mode (no real Bittensor connection, for simulation/testing)",
-    )
-    
     args = parser.parse_args()
     
     # Configure logging
@@ -626,21 +547,15 @@ def main() -> None:
     logger.info(f"  Wallet: {config['wallet_name']}/{config['hotkey_name']}")
     logger.info(f"  Loop interval: {config['loop_interval']}s")
     logger.info(f"  ValidatorDB: {config['use_validator_db']}")
-    logger.info(f"  Mock mode: {args.mock_mode}")
 
     # Initialize Bittensor components
     try:
-        if args.mock_mode:
-            wallet, subtensor, dendrite, metagraph = initialize_bittensor_mock(
-                netuid=config["netuid"],
-            )
-        else:
-            wallet, subtensor, dendrite, metagraph = initialize_bittensor(
-                wallet_name=config["wallet_name"],
-                hotkey_name=config["hotkey_name"],
-                netuid=config["netuid"],
-                network=config["network"],
-            )
+        wallet, subtensor, dendrite, metagraph = initialize_bittensor(
+            wallet_name=config["wallet_name"],
+            hotkey_name=config["hotkey_name"],
+            netuid=config["netuid"],
+            network=config["network"],
+        )
     except Exception as e:
         logger.error(f"Failed to initialize Bittensor: {e}")
         return
