@@ -79,4 +79,3 @@ def test_config():
         "wahoo_api_url": "https://api.wahoopredict.com",
         "wahoo_validation_endpoint": "https://api.wahoopredict.com/api/v2/event/bittensor/statistics",
     }
-

@@ -43,7 +43,9 @@ def generate_prediction(event_id: str) -> tuple[float, float, float]:
     prob_no = 1.0 - prob_yes
     confidence = random.uniform(0.5, 0.9)
 
-    logger.debug(f"Generated prediction for {event_id}: yes={prob_yes:.2f}, no={prob_no:.2f}, conf={confidence:.2f}")
+    logger.debug(
+        f"Generated prediction for {event_id}: yes={prob_yes:.2f}, no={prob_no:.2f}, conf={confidence:.2f}"
+    )
 
     return prob_yes, prob_no, confidence
 

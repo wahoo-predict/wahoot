@@ -40,9 +40,7 @@ def load_validator_config() -> Dict[str, Any]:
         "hotkey_name": os.getenv("HOTKEY_NAME", "default"),
         "loop_interval": float(os.getenv("LOOP_INTERVAL", "100.0")),
         "use_validator_db": os.getenv("USE_VALIDATOR_DB", "false").lower() == "true",
-        "wahoo_api_url": os.getenv(
-            "WAHOO_API_URL", "https://api.wahoopredict.com"
-        ),
+        "wahoo_api_url": os.getenv("WAHOO_API_URL", "https://api.wahoopredict.com"),
         "wahoo_validation_endpoint": os.getenv(
             "WAHOO_VALIDATION_ENDPOINT",
             "https://api.wahoopredict.com/api/v2/event/bittensor/statistics",
@@ -101,9 +99,7 @@ def initialize_bittensor(
     try:
         metagraph = bt.metagraph(netuid=netuid, network=network)
         metagraph.sync(subtensor=subtensor)
-        logger.info(
-            f"Metagraph synced: {len(metagraph.uids)} UIDs on subnet {netuid}"
-        )
+        logger.info(f"Metagraph synced: {len(metagraph.uids)} UIDs on subnet {netuid}")
     except Exception as e:
         logger.error(f"Failed to load metagraph: {e}")
         raise
@@ -111,9 +107,7 @@ def initialize_bittensor(
     return wallet, subtensor, dendrite, metagraph
 
 
-def sync_metagraph(
-    metagraph: bt.Metagraph, subtensor: bt.Subtensor
-) -> bt.Metagraph:
+def sync_metagraph(metagraph: bt.Metagraph, subtensor: bt.Subtensor) -> bt.Metagraph:
     """
     Sync metagraph to get latest blockchain state.
 
@@ -366,9 +360,7 @@ def main_loop_iteration(
             if rewards_sum > 0.0:
                 logger.info(f"✓ Rewards sum: {rewards_sum:.6f} (ready to set weights)")
             else:
-                logger.warning(
-                    "All rewards are zero, skipping set_weights() call"
-                )
+                logger.warning("All rewards are zero, skipping set_weights() call")
                 return
         except Exception as e:
             logger.error(f"Failed to calculate rewards: {e}")
@@ -517,11 +509,13 @@ def main() -> None:
 
     # Auto-initialize on first run (if database doesn't exist)
     from .database.validator_db import check_database_exists, get_db_path
+
     db_path = get_db_path()
     if not check_database_exists(db_path):
         logger.info("First run detected - initializing database...")
         try:
             from .init import initialize
+
             initialize(skip_deps=True, skip_db=False, db_path=str(db_path))
             logger.info("✓ Database initialized successfully")
         except Exception as e:

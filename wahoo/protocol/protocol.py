@@ -12,9 +12,9 @@ import bittensor as bt
 class WAHOOPredict(bt.Synapse):
     """
     Synapse for WaHoo Predict protocol.
-    
+
     Miners respond with their prediction probabilities for a given event.
-    
+
     Fields:
         event_id: The event ID to make a prediction for
         prob_yes: Probability that the event will occur (0.0 to 1.0)
@@ -22,7 +22,7 @@ class WAHOOPredict(bt.Synapse):
         confidence: Confidence level in the prediction (0.0 to 1.0)
         protocol_version: Version of the protocol being used
     """
-    
+
     event_id: str = ""
     prob_yes: Optional[float] = None
     prob_no: Optional[float] = None
@@ -32,4 +32,3 @@ class WAHOOPredict(bt.Synapse):
     def deserialize(self) -> "WAHOOPredict":
         """Deserialize the synapse."""
         return self
-
