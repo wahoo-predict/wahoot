@@ -291,7 +291,20 @@ class TestValidatorEdgeCases:
         active_uids = [0]
         mock_get_active_uids.return_value = active_uids
         mock_build_uid_to_hotkey.return_value = {0: "hotkey1"}
-        mock_get_validation_data.return_value = []
+        # Provide valid validation data with guaranteed usable metrics
+        # to ensure the loop proceeds to set_weights
+        performance = PerformanceMetrics(
+            total_volume_usd=1000.0,  # > 0, ensures has_volume
+            realized_profit_usd=100.0,  # not None, ensures has_profit
+            trade_count=50,  # > 0, ensures has_trades
+        )
+        mock_validation_data = [
+            ValidationRecord(
+                hotkey="hotkey1",
+                performance=performance,
+            )
+        ]
+        mock_get_validation_data.return_value = mock_validation_data
         mock_reward.return_value = torch.tensor([1.0])
 
         mock_set_weights.return_value = (None, False)
