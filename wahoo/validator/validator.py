@@ -163,7 +163,7 @@ def main_loop_iteration(
     logger.info("=" * 70)
     logger.info("Starting main loop iteration")
     logger.info("=" * 70)
-    
+
     # Run cache cleanup periodically (every 10 iterations, ~16 minutes at 100s interval)
     if validator_db is not None and hasattr(validator_db, "cleanup_old_cache"):
         if iteration_count > 0 and iteration_count % 10 == 0:
@@ -202,12 +202,13 @@ def main_loop_iteration(
                 validator_db=validator_db,
             )
             logger.info(f"✓ Fetched validation data for {len(validation_data)} miners")
-            
+
             # Check if we should skip weight computation due to no usable data
             if should_skip_weight_computation(validation_data, log_reason=True):
                 logger.warning(
                     "No usable validation data available after API + cache fallback. "
-                    "Skipping weight computation and set_weights() call for this iteration."
+                    "Skipping weight computation and set_weights() call "
+                    "for this iteration."
                 )
                 return
         except Exception as e:
@@ -217,7 +218,8 @@ def main_loop_iteration(
             if should_skip_weight_computation(validation_data, log_reason=True):
                 logger.warning(
                     "No usable validation data after exception. "
-                    "Skipping weight computation and set_weights() call for this iteration."
+                    "Skipping weight computation and set_weights() call "
+                    "for this iteration."
                 )
                 return
 

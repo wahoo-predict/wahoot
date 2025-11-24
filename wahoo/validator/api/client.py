@@ -154,7 +154,8 @@ class ValidationAPIClient:
                 ) from exc
             except httpx.HTTPError as exc:
                 bt.logging.warning(
-                    f"ValidationAPI request failed (attempt {attempt}/{max_attempts}): {exc}"
+                    f"ValidationAPI request failed "
+                    f"(attempt {attempt}/{max_attempts}): {exc}"
                 )
                 if attempt >= max_attempts:
                     bt.logging.error(
@@ -169,7 +170,8 @@ class ValidationAPIClient:
             if response.status_code == 200:
                 if attempt > 1:
                     bt.logging.info(
-                        f"ValidationAPI request succeeded on attempt {attempt}/{max_attempts}"
+                        f"ValidationAPI request succeeded on attempt "
+                        f"{attempt}/{max_attempts}"
                     )
                 return response
 
@@ -211,7 +213,8 @@ class ValidationAPIClient:
         except ValueError:
             payload = response.text
         bt.logging.error(
-            f"ValidationAPI request failed with status {response.status_code}: {payload}"
+            f"ValidationAPI request failed with status "
+            f"{response.status_code}: {payload}"
         )
         raise ValidationAPIError(
             f"Validation API request failed with status {response.status_code}"
@@ -279,14 +282,14 @@ class ValidatorDBInterface:
     ) -> List[Dict[str, Any]]:
         """
         Retrieve cached validation data for given hotkeys.
-        
+
         Args:
             hotkeys: List of hotkeys to retrieve
             max_age_days: Only return entries newer than this many days (default: 7)
-            
+
         Returns:
             List of data dictionaries (one per hotkey)
-            
+
         Note:
             Implementation should filter entries by timestamp to ensure
             entries are newer than max_age_days before returning.
@@ -296,10 +299,10 @@ class ValidatorDBInterface:
     def delete_cached_validation_data(self, hotkeys: Sequence[str]) -> None:
         """
         Delete cached validation data for given hotkeys.
-        
+
         Args:
             hotkeys: List of hotkeys to delete from cache
-            
+
         Note:
             This method is optional. If not implemented, invalid cache entries
             will be skipped but not deleted.
@@ -309,13 +312,13 @@ class ValidatorDBInterface:
     def cleanup_old_cache(self, max_age_days: int = 7) -> int:
         """
         Delete cache entries older than max_age_days and run VACUUM.
-        
+
         Args:
             max_age_days: Delete entries older than this many days (default: 7)
-            
+
         Returns:
             Number of entries deleted
-            
+
         Note:
             Should run VACUUM after deletion to reclaim disk space.
         """
@@ -404,7 +407,7 @@ def get_wahoo_validation_data(
                     if cached_data:
                         cached_records = []
                         invalid_hotkeys = []
-                        
+
                         for data_dict in cached_data:
                             try:
                                 # Validate cached JSON structure matches expected format
@@ -415,21 +418,27 @@ def get_wahoo_validation_data(
                                 hotkey = data_dict.get("hotkey", "unknown")
                                 invalid_hotkeys.append(hotkey)
                                 bt.logging.debug(
-                                    f"Invalid cached data for hotkey {hotkey}: {validation_error}. "
-                                    "Will be deleted from cache."
+                                    f"Invalid cached data for hotkey {hotkey}: "
+                                    f"{validation_error}. Will be deleted from cache."
                                 )
                                 continue
 
                         # Delete invalid cache entries if ValidatorDB supports it
-                        if invalid_hotkeys and hasattr(validator_db, "delete_cached_validation_data"):
+                        if invalid_hotkeys and hasattr(
+                            validator_db, "delete_cached_validation_data"
+                        ):
                             try:
-                                validator_db.delete_cached_validation_data(hotkeys=invalid_hotkeys)
+                                validator_db.delete_cached_validation_data(
+                                    hotkeys=invalid_hotkeys
+                                )
                                 bt.logging.info(
-                                    f"Deleted {len(invalid_hotkeys)} invalid cache entry/entries"
+                                    f"Deleted {len(invalid_hotkeys)} "
+                                    f"invalid cache entry/entries"
                                 )
                             except Exception as delete_error:
                                 bt.logging.warning(
-                                    f"Failed to delete invalid cache entries: {delete_error}"
+                                    f"Failed to delete invalid cache entries: "
+                                    f"{delete_error}"
                                 )
 
                         # Log detailed cache fallback statistics
@@ -453,8 +462,8 @@ def get_wahoo_validation_data(
                         else:
                             bt.logging.warning(
                                 f"Cache fallback for batch {batch_num}: "
-                                f"All {total_cached} cached entries were invalid or missing. "
-                                f"Requested {total_requested} hotkeys."
+                                f"All {total_cached} cached entries were invalid "
+                                f"or missing. Requested {total_requested} hotkeys."
                             )
                     else:
                         bt.logging.warning(
