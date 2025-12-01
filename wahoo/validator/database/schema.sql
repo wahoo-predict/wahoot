@@ -43,6 +43,10 @@ CREATE TABLE IF NOT EXISTS scoring_runs (
     ts TEXT NOT NULL,
     hotkey TEXT NOT NULL,
     score REAL,
-    reason TEXT  -- JSON or stringified dict, namely for errors. Can be removed if not necessary.
+    reason TEXT
 );
+
+CREATE INDEX IF NOT EXISTS idx_scoring_hotkey_ts
+    ON scoring_runs(hotkey, ts DESC);
+
 

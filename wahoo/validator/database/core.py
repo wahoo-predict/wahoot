@@ -166,10 +166,11 @@ class ValidatorDB(ValidatorDBInterface):
             )
             deleted = cursor.rowcount
             
-            cursor.execute(
-                "DELETE FROM scoring_runs WHERE ts < ?",
-                (cutoff_date,),
-            )
+            # NOTE: We need to keep scoring runs for EMA
+            # cursor.execute(
+            #     "DELETE FROM scoring_runs WHERE ts < ?",
+            #     (cutoff_date,),
+            # )
             
             conn.commit()
             conn.execute("VACUUM")

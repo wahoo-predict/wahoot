@@ -140,21 +140,14 @@ def compute_weights(
     from .scoring.operators import EMAVolumeScorer
     
     logger.debug("Computing weights using EMAVolumeScorer...")
-    
-    # Convert validation records to DataFrame
     df = records_to_dataframe(validation_data)
     
     if df.empty:
         logger.warning("No validation data to compute weights from")
         return {}, {}
     
-    # Initialize operator
     scorer = EMAVolumeScorer()
-    
-    # Run scoring with EMA
-    result = scorer.run(df, previous_scores=previous_scores)
-    
-    # Extract weights and build dict
+    result = scorer.run(df, previous_scores=previous_scores) 
     weights: Dict[str, float] = {}
     
     hotkeys = df["hotkey"].to_numpy()
@@ -163,11 +156,9 @@ def compute_weights(
         if weight > 0:
             weights[hotkey] = weight
     
-    # Extract smoothed scores for EMA persistence (stored in metadata)
     updated_scores: Dict[str, float] = result.meta.get("smoothed_scores", {})
 
     
-    # Log metadata
     logger.info(
         f"EMA Scoring: {result.meta['total_miners']} miners, "
         f"{result.meta['new_miners']} new, "
@@ -176,9 +167,7 @@ def compute_weights(
     )
     logger.debug(f"Scoring metadata: {result.meta}")
     
-    # For now, return weights twice (we'll improve score persistence later)
-    # TODO: Modify operator to also return raw smoothed scores for DB storage
-    return weights, weights
+    return weights, updated_scores
 
 
 
@@ -240,10 +229,20 @@ def main_loop_iteration(
             if should_skip_weight_computation(validation_data, log_reason=True):
                 logger.warning(
                     "No usable validation data available after API + cache fallback. "
-                    "Skipping weight computation and set_weights() call "
-                    "for this iteration."
+                    "Attempting to use last known good scores from database..."
                 )
-                return
+                
+                from .scoring.fallback import get_fallback_weights_from_db
+                
+                wahoo_weights = get_fallback_weights_from_db(validator_db)
+                if wahoo_weights is not None:
+                    validation_data = []
+                else:
+                    logger.warning("No fallback weights available, skipping iteration")
+                    return
+            else:
+                wahoo_weights = None
+                
         except Exception as e:
             logger.error(f"Failed to fetch validation data: {e}")
             validation_data = []
@@ -275,33 +274,40 @@ def main_loop_iteration(
         logger.info(f"✓ Queried {len(miner_responses)} miners (placeholder)")
 
         logger.info("[7/9] Computing weights...") 
-        # Get previous EMA scores from DB if available, else from config (memory)
-        previous_ema_scores = config.get("ema_scores", {})
-        if not previous_ema_scores and validator_db is not None:
-            try:
-                previous_ema_scores = validator_db.get_latest_scores()
-                if previous_ema_scores:
-                    logger.info(f"Loaded {len(previous_ema_scores)} EMA scores from database")
-            except Exception as e:
-                logger.warning(f"Failed to load EMA scores from DB: {e}")
         
-        wahoo_weights, updated_ema_scores = compute_weights(
-            validation_data=validation_data,
-            active_uids=active_uids,
-            uid_to_hotkey=uid_to_hotkey,
-            previous_scores=previous_ema_scores,
-        )
-        
-        # Store updated EMA scores for next iteration (memory)
-        config["ema_scores"] = updated_ema_scores
-        
-        # Persist to DB
-        if validator_db is not None and updated_ema_scores:
-            try:
-                validator_db.add_scoring_run(updated_ema_scores, reason="ema_update")
-                logger.debug(f"Saved {len(updated_ema_scores)} EMA scores to database")
-            except Exception as e:
-                logger.warning(f"Failed to save EMA scores to DB: {e}")
+        if wahoo_weights is not None:
+            logger.info("Using fallback weights from DB, skipping new computation")
+            updated_ema_scores = {}  # No new scores to save
+        else:
+            previous_ema_scores = {}
+            if validator_db is not None:
+                try:
+                    from .scoring.validation import validate_ema_scores
+                    
+                    raw_scores = validator_db.get_latest_scores()
+                    if raw_scores:
+                        previous_ema_scores = validate_ema_scores(raw_scores)
+                        logger.info(f"Loaded {len(previous_ema_scores)} valid EMA scores from database")
+                except Exception as e:
+                    logger.warning(f"Failed to load EMA scores from DB: {e}")
+                    previous_ema_scores = {}
+            
+            if not previous_ema_scores:
+                previous_ema_scores = config.get("ema_scores", {})
+            
+            wahoo_weights, updated_ema_scores = compute_weights(
+                validation_data=validation_data,
+                active_uids=active_uids,
+                uid_to_hotkey=uid_to_hotkey,
+                previous_scores=previous_ema_scores,
+            )
+            
+            if validator_db is not None and updated_ema_scores:
+                try:
+                    validator_db.add_scoring_run(updated_ema_scores, reason="ema_update")
+                    logger.debug(f"Saved {len(updated_ema_scores)} EMA scores to database")
+                except Exception as e:
+                    logger.warning(f"Failed to save EMA scores to DB: {e}")
         
         logger.info(f"✓ Computed weights for {len(wahoo_weights)} miners")
 
