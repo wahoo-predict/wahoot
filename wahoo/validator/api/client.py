@@ -324,6 +324,25 @@ class ValidatorDBInterface:
         """
         raise NotImplementedError
 
+    def add_scoring_run(self, scores: Dict[str, float], reason: str = "ema_update") -> None:
+        """
+        Save EMA scores to DB.
+
+        Args:
+            scores: Dictionary of hotkey -> score
+            reason: Reason for the update (default: "ema_update")
+        """
+        raise NotImplementedError
+
+    def get_latest_scores(self) -> Dict[str, float]:
+        """
+        Retrieve the most recent score for every hotkey.
+
+        Returns:
+            Dictionary of hotkey -> score
+        """
+        raise NotImplementedError
+
 
 def get_wahoo_validation_data(
     hotkeys: Sequence[str],

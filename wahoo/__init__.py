@@ -5,7 +5,7 @@ from .validator.dataframe import (
     ensure_required_columns,
     flatten_record,
 )
-from .validator.scoring.operators import Operator, OperatorResult, VolumeProfitOperator
+from .validator.scoring.operators import Operator, OperatorResult, EMAVolumeScorer
 from .validator.scoring.pipeline import OperatorPipeline
 
 __all__ = [
@@ -18,6 +18,6 @@ __all__ = [
     "flatten_record",
     "Operator",
     "OperatorResult",
-    "VolumeProfitOperator",
+    "EMAVolumeScorer",
     "OperatorPipeline",
 ]
