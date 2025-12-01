@@ -6,7 +6,11 @@ from typing import Dict, List, Optional, Any
 import bittensor as bt
 from dotenv import load_dotenv
 
-from .api import get_active_event_id, get_wahoo_validation_data
+from .api import (
+    get_active_event_id,
+    get_wahoo_validation_data,
+    should_skip_weight_computation,
+)
 from .blockchain import set_weights_with_retry
 from .scoring.rewards import reward
 from .utils.miners import build_uid_to_hotkey, get_active_uids
@@ -153,11 +157,25 @@ def main_loop_iteration(
     netuid: int,
     config: Dict[str, Any],
     validator_db: Optional[Any] = None,
+    iteration_count: int = 0,
 ) -> None:
     iteration_start = time.time()
     logger.info("=" * 70)
     logger.info("Starting main loop iteration")
     logger.info("=" * 70)
+
+    # Run cache cleanup periodically (every 10 iterations, ~16 minutes at 100s interval)
+    if validator_db is not None and hasattr(validator_db, "cleanup_old_cache"):
+        if iteration_count > 0 and iteration_count % 10 == 0:
+            try:
+                deleted_count = validator_db.cleanup_old_cache(max_age_days=7)
+                if deleted_count > 0:
+                    logger.info(
+                        f"Cache cleanup: Deleted {deleted_count} old cache entries "
+                        f"(older than 7 days)"
+                    )
+            except Exception as cleanup_error:
+                logger.warning(f"Cache cleanup failed: {cleanup_error}")
 
     try:
         logger.info("[1/9] Syncing metagraph...")
@@ -184,9 +202,26 @@ def main_loop_iteration(
                 validator_db=validator_db,
             )
             logger.info(f"✓ Fetched validation data for {len(validation_data)} miners")
+
+            # Check if we should skip weight computation due to no usable data
+            if should_skip_weight_computation(validation_data, log_reason=True):
+                logger.warning(
+                    "No usable validation data available after API + cache fallback. "
+                    "Skipping weight computation and set_weights() call "
+                    "for this iteration."
+                )
+                return
         except Exception as e:
             logger.error(f"Failed to fetch validation data: {e}")
             validation_data = []
+            # Check if we should skip after exception
+            if should_skip_weight_computation(validation_data, log_reason=True):
+                logger.warning(
+                    "No usable validation data after exception. "
+                    "Skipping weight computation and set_weights() call "
+                    "for this iteration."
+                )
+                return
 
         logger.info("[5/9] Getting active event ID...")
         try:
@@ -410,6 +445,7 @@ def main() -> None:
     logger.info(f"Loop interval: {config['loop_interval']}s")
     logger.info("Press Ctrl+C to stop")
 
+    iteration_count = 0
     try:
         while True:
             main_loop_iteration(
@@ -420,7 +456,9 @@ def main() -> None:
                 netuid=config["netuid"],
                 config=config,
                 validator_db=validator_db,
+                iteration_count=iteration_count,
             )
+            iteration_count += 1
 
             sleep_time = config["loop_interval"]
             logger.info(f"Sleeping for {sleep_time}s before next iteration...")
