@@ -324,7 +324,9 @@ class ValidatorDBInterface:
         """
         raise NotImplementedError
 
-    def add_scoring_run(self, scores: Dict[str, float], reason: str = "ema_update") -> None:
+    def add_scoring_run(
+        self, scores: Dict[str, float], reason: str = "ema_update"
+    ) -> None:
         """
         Save EMA scores to DB.
 
