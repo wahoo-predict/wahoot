@@ -124,13 +124,13 @@ def compute_weights(
 ) -> tuple[Dict[str, float], Dict[str, float]]:
     """
     Compute weights using EMAVolumeScorer operator.
-    
+
     Args:
         validation_data: List of ValidationRecord objects
         active_uids: List of active UIDs
         uid_to_hotkey: Mapping from UID to hotkey
         previous_scores: Previous EMA scores for continuity (hotkey -> score)
-    
+
     Returns:
         Tuple of (weights_dict, updated_scores_dict) where:
         - weights_dict: hotkey -> normalized weight (for rewards calculation)
@@ -138,27 +138,26 @@ def compute_weights(
     """
     from .dataframe import records_to_dataframe
     from .scoring.operators import EMAVolumeScorer
-    
+
     logger.debug("Computing weights using EMAVolumeScorer...")
     df = records_to_dataframe(validation_data)
-    
+
     if df.empty:
         logger.warning("No validation data to compute weights from")
         return {}, {}
-    
+
     scorer = EMAVolumeScorer()
-    result = scorer.run(df, previous_scores=previous_scores) 
+    result = scorer.run(df, previous_scores=previous_scores)
     weights: Dict[str, float] = {}
-    
+
     hotkeys = df["hotkey"].to_numpy()
     for i, hotkey in enumerate(hotkeys):
         weight = float(result.weights[i])
         if weight > 0:
             weights[hotkey] = weight
-    
+
     updated_scores: Dict[str, float] = result.meta.get("smoothed_scores", {})
 
-    
     logger.info(
         f"EMA Scoring: {result.meta['total_miners']} miners, "
         f"{result.meta['new_miners']} new, "
@@ -166,9 +165,8 @@ def compute_weights(
         f"max_weight={result.meta['max_weight']:.6f}"
     )
     logger.debug(f"Scoring metadata: {result.meta}")
-    
-    return weights, updated_scores
 
+    return weights, updated_scores
 
 
 def main_loop_iteration(
@@ -231,9 +229,9 @@ def main_loop_iteration(
                     "No usable validation data available after API + cache fallback. "
                     "Attempting to use last known good scores from database..."
                 )
-                
+
                 from .scoring.fallback import get_fallback_weights_from_db
-                
+
                 wahoo_weights = get_fallback_weights_from_db(validator_db)
                 if wahoo_weights is not None:
                     validation_data = []
@@ -242,7 +240,7 @@ def main_loop_iteration(
                     return
             else:
                 wahoo_weights = None
-                
+
         except Exception as e:
             logger.error(f"Failed to fetch validation data: {e}")
             validation_data = []
@@ -273,8 +271,8 @@ def main_loop_iteration(
         )
         logger.info(f"✓ Queried {len(miner_responses)} miners (placeholder)")
 
-        logger.info("[7/9] Computing weights...") 
-        
+        logger.info("[7/9] Computing weights...")
+
         if wahoo_weights is not None:
             logger.info("Using fallback weights from DB, skipping new computation")
             updated_ema_scores = {}  # No new scores to save
@@ -283,32 +281,38 @@ def main_loop_iteration(
             if validator_db is not None:
                 try:
                     from .scoring.validation import validate_ema_scores
-                    
+
                     raw_scores = validator_db.get_latest_scores()
                     if raw_scores:
                         previous_ema_scores = validate_ema_scores(raw_scores)
-                        logger.info(f"Loaded {len(previous_ema_scores)} valid EMA scores from database")
+                        logger.info(
+                            f"Loaded {len(previous_ema_scores)} valid EMA scores from database"
+                        )
                 except Exception as e:
                     logger.warning(f"Failed to load EMA scores from DB: {e}")
                     previous_ema_scores = {}
-            
+
             if not previous_ema_scores:
                 previous_ema_scores = config.get("ema_scores", {})
-            
+
             wahoo_weights, updated_ema_scores = compute_weights(
                 validation_data=validation_data,
                 active_uids=active_uids,
                 uid_to_hotkey=uid_to_hotkey,
                 previous_scores=previous_ema_scores,
             )
-            
+
             if validator_db is not None and updated_ema_scores:
                 try:
-                    validator_db.add_scoring_run(updated_ema_scores, reason="ema_update")
-                    logger.debug(f"Saved {len(updated_ema_scores)} EMA scores to database")
+                    validator_db.add_scoring_run(
+                        updated_ema_scores, reason="ema_update"
+                    )
+                    logger.debug(
+                        f"Saved {len(updated_ema_scores)} EMA scores to database"
+                    )
                 except Exception as e:
                     logger.warning(f"Failed to save EMA scores to DB: {e}")
-        
+
         logger.info(f"✓ Computed weights for {len(wahoo_weights)} miners")
 
         logger.info("[8/9] Calculating rewards...")
@@ -505,6 +509,7 @@ def main() -> None:
     if config["use_validator_db"]:
         try:
             from .database.core import ValidatorDB
+
             validator_db = ValidatorDB(db_path=get_db_path())
             logger.info(f"ValidatorDB initialized at {get_db_path()}")
         except Exception as e:

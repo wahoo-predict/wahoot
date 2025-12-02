@@ -1,7 +1,5 @@
-import json
 import logging
 import sqlite3
-import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
@@ -29,9 +27,9 @@ class ValidatorDB(ValidatorDBInterface):
             cursor = conn.cursor()
 
             perf = data_dict.get("performance", {})
-            
+
             timestamp = datetime.utcnow().isoformat() + "Z"
-            
+
             cursor.execute(
                 """
                 INSERT INTO performance_snapshots (
@@ -55,7 +53,7 @@ class ValidatorDB(ValidatorDBInterface):
                     perf.get("referral_volume_usd"),
                 ),
             )
-            
+
             cursor.execute(
                 """
                 INSERT INTO miners (hotkey, last_seen_ts)
@@ -64,7 +62,7 @@ class ValidatorDB(ValidatorDBInterface):
                 """,
                 (hotkey, timestamp),
             )
-            
+
             conn.commit()
             conn.close()
         except Exception as e:
@@ -85,7 +83,7 @@ class ValidatorDB(ValidatorDBInterface):
             cursor = conn.cursor()
 
             cutoff_date = (datetime.utcnow() - timedelta(days=max_age_days)).isoformat()
-            
+
             placeholders = ",".join("?" for _ in hotkeys)
             query = f"""
                 SELECT * FROM performance_snapshots
@@ -93,7 +91,7 @@ class ValidatorDB(ValidatorDBInterface):
                 AND timestamp > ?
                 ORDER BY timestamp DESC
             """
-            
+
             query = f"""
                 SELECT * FROM (
                     SELECT *,
@@ -103,7 +101,7 @@ class ValidatorDB(ValidatorDBInterface):
                     AND timestamp > ?
                 ) WHERE rn = 1
             """
-            
+
             params = list(hotkeys) + [cutoff_date]
             cursor.execute(query, params)
             rows = cursor.fetchall()
@@ -123,13 +121,13 @@ class ValidatorDB(ValidatorDBInterface):
                     "referral_count": data["referral_count"],
                     "referral_volume_usd": data["referral_volume"],
                 }
-                
+
                 record = {
                     "hotkey": data["hotkey"],
                     "performance": perf,
                 }
                 results.append(record)
-                
+
             return results
 
         except Exception as e:
@@ -139,7 +137,7 @@ class ValidatorDB(ValidatorDBInterface):
     def delete_cached_validation_data(self, hotkeys: Sequence[str]) -> None:
         if not hotkeys:
             return
-            
+
         try:
             conn = self._get_conn()
             cursor = conn.cursor()
@@ -157,31 +155,33 @@ class ValidatorDB(ValidatorDBInterface):
         try:
             conn = self._get_conn()
             cursor = conn.cursor()
-            
+
             cutoff_date = (datetime.utcnow() - timedelta(days=max_age_days)).isoformat()
-            
+
             cursor.execute(
                 "DELETE FROM performance_snapshots WHERE timestamp < ?",
                 (cutoff_date,),
             )
             deleted = cursor.rowcount
-            
+
             # NOTE: We need to keep scoring runs for EMA
             # cursor.execute(
             #     "DELETE FROM scoring_runs WHERE ts < ?",
             #     (cutoff_date,),
             # )
-            
+
             conn.commit()
             conn.execute("VACUUM")
             conn.close()
-            
+
             return deleted
         except Exception as e:
             logger.error(f"Failed to cleanup cache: {e}")
             return 0
 
-    def add_scoring_run(self, scores: Dict[str, float], reason: str = "ema_update") -> None:
+    def add_scoring_run(
+        self, scores: Dict[str, float], reason: str = "ema_update"
+    ) -> None:
         """
         Save EMA scores to DB.
         """
@@ -191,19 +191,18 @@ class ValidatorDB(ValidatorDBInterface):
         try:
             conn = self._get_conn()
             cursor = conn.cursor()
-            
+
             timestamp = datetime.utcnow().isoformat() + "Z"
-            
+
             data = [
-                (timestamp, hotkey, score, reason)
-                for hotkey, score in scores.items()
+                (timestamp, hotkey, score, reason) for hotkey, score in scores.items()
             ]
-            
+
             cursor.executemany(
                 "INSERT INTO scoring_runs (ts, hotkey, score, reason) VALUES (?, ?, ?, ?)",
-                data
+                data,
             )
-            
+
             conn.commit()
             conn.close()
         except Exception as e:
@@ -216,7 +215,7 @@ class ValidatorDB(ValidatorDBInterface):
         try:
             conn = self._get_conn()
             cursor = conn.cursor()
-            
+
             query = """
                 SELECT hotkey, score
                 FROM (
@@ -226,11 +225,11 @@ class ValidatorDB(ValidatorDBInterface):
                 )
                 WHERE rn = 1
             """
-            
+
             cursor.execute(query)
             rows = cursor.fetchall()
             conn.close()
-            
+
             return {row[0]: row[1] for row in rows}
         except Exception as e:
             logger.error(f"Failed to retrieve latest scores: {e}")
