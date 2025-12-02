@@ -358,17 +358,9 @@ def main_loop_iteration(
                 weights=rewards,
             )
             if success:
-                # Enhanced logging for successful weight setting
-                logger.info("=" * 70)
-                logger.info("✓✓✓ WEIGHTS SET SUCCESSFULLY ON BLOCKCHAIN ✓✓✓")
-                logger.info("=" * 70)
-                logger.info(f"Transaction Hash: {transaction_hash}")
-                logger.info(f"Number of Miners: {len(active_uids)}")
-                logger.info("Weight Distribution:")
-                for uid, weight in zip(active_uids, rewards):
-                    logger.info(f"  UID {uid}: {weight:.6f} ({weight*100:.2f}%)")
-                logger.info(f"Total Weight Sum: {rewards.sum().item():.6f}")
-                logger.info("=" * 70)
+                logger.info(
+                    f"✓ Weights set successfully. Transaction: {transaction_hash}"
+                )
             else:
                 logger.warning("Failed to set weights (will retry next iteration)")
         except Exception as e:
