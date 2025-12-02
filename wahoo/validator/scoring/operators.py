@@ -44,7 +44,7 @@ class EMAVolumeScorer(Operator):
         Raw_Score = (Volume^0.7) * max(0, 1 + (Total_PnL / max(Volume, 1)))
         Smoothed_Score = (1-a) * Previous_Score + a * Raw_Score
     """
-    
+
     name = "ema_volume"
     required_columns = (
         "hotkey",
@@ -69,49 +69,51 @@ class EMAVolumeScorer(Operator):
     ) -> OperatorResult:
         """
         Compute EMA-smoothed weights from validation data.
-        
+
         Args:
             df: DataFrame with columns: hotkey, total_volume_usd, realized_profit_usd, unrealized_profit_usd
             previous_scores: Dict mapping hotkey -> previous smoothed score
-        
+
         Returns:
             OperatorResult with normalized weights and metadata
         """
         df = self.preprocess(df)
-        
+
         if previous_scores is None:
             previous_scores = {}
-        
+
         hotkeys = df["hotkey"].to_numpy()
         volume = np.maximum(df["total_volume_usd"].fillna(0).to_numpy(dtype=float), 0.0)
         realized_pnl = df["realized_profit_usd"].fillna(0).to_numpy(dtype=float)
         unrealized_pnl = df["unrealized_profit_usd"].fillna(0).to_numpy(dtype=float)
-        
+
         total_pnl = realized_pnl + unrealized_pnl
-        
+
         volume_component = np.power(volume, self.volume_exp)
         safe_volume = np.maximum(volume, MIN_VOLUME_THRESHOLD)
         pnl_ratio = total_pnl / safe_volume
         pnl_multiplier = np.maximum(0.0, 1.0 + pnl_ratio)
-        
+
         raw_scores = volume_component * pnl_multiplier
         smoothed_scores = np.zeros_like(raw_scores)
         new_miner_count = 0
-        
+
         for i, hotkey in enumerate(hotkeys):
             prev_score = previous_scores.get(hotkey, 0.0)
             if prev_score == 0.0:
                 smoothed_scores[i] = raw_scores[i]
                 new_miner_count += 1
             else:
-                smoothed_scores[i] = (1 - self.alpha) * prev_score + self.alpha * raw_scores[i]
-        
+                smoothed_scores[i] = (
+                    1 - self.alpha
+                ) * prev_score + self.alpha * raw_scores[i]
+
         total = smoothed_scores.sum()
         if total > 0:
             weights = smoothed_scores / total
         else:
             weights = np.zeros_like(smoothed_scores)
-        
+
         meta = {
             "total_miners": len(hotkeys),
             "new_miners": new_miner_count,
@@ -128,7 +130,6 @@ class EMAVolumeScorer(Operator):
             },
         }
 
-        
         return OperatorResult(weights=weights, meta=meta)
 
 
