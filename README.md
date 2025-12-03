@@ -178,7 +178,7 @@ That's it!
 - **Python 3.10+** (3.11 or 3.12 recommended)
 - **Unix/Linux system** (macOS or Linux)
 - **SQLite 3** (usually pre-installed)
-- **Virtual environment** (recommended: `venv`, `virtualenv`, or `uv`)
+- **Virtual environment** (recommended: `uv` , `venv`, or `virtualenv`)
 
 #### Installation Options
 

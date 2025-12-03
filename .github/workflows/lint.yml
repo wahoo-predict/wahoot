@@ -1,4 +1,4 @@
-name: Python Tests
+name: Lint Check
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   pull_request:
 
 jobs:
-  tests:
+  lint:
     runs-on: ubuntu-latest
 
     steps:
