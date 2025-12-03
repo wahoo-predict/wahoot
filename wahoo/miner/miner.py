@@ -1,6 +1,7 @@
 import logging
 import os
 import time
+from typing import Optional
 
 import bittensor as bt
 from dotenv import load_dotenv
@@ -33,10 +34,25 @@ class Miner:
         hotkey_name: str = "default",
         netuid: int = 1,
         network: str = "local",
+        chain_endpoint: Optional[str] = None,
     ):
         self.wallet = bt.wallet(name=wallet_name, hotkey=hotkey_name)
-        self.subtensor = bt.subtensor(network=network)
-        self.metagraph = bt.metagraph(netuid=netuid, network=network)
+        # Use chain_endpoint for local net, otherwise use network
+        # Pass endpoint URL as network parameter
+        if chain_endpoint:
+            self.subtensor = bt.subtensor(network=chain_endpoint)
+        elif network == "local":
+            # Default local endpoint
+            self.subtensor = bt.subtensor(network="ws://127.0.0.1:9945")
+        else:
+            self.subtensor = bt.subtensor(network=network)
+        # Metagraph uses the same network/endpoint
+        if chain_endpoint:
+            self.metagraph = bt.metagraph(netuid=netuid, network=chain_endpoint)
+        elif network == "local":
+            self.metagraph = bt.metagraph(netuid=netuid, network="ws://127.0.0.1:9945")
+        else:
+            self.metagraph = bt.metagraph(netuid=netuid, network=network)
         self.netuid = netuid
         self.network = network
 
@@ -87,6 +103,20 @@ class Miner:
         logger.info("Starting axon server...")
         self.axon.start()
 
+        # Serve axon on blockchain so validators can find it
+        logger.info("Serving axon on blockchain...")
+        try:
+            self.subtensor.serve_axon(
+                netuid=self.netuid,
+                axon=self.axon,
+            )
+            logger.info("✓ Axon served on blockchain")
+        except Exception as e:
+            logger.error(f"Failed to serve axon on blockchain: {e}")
+            logger.warning(
+                "Miner will continue but validators may not be able to find it"
+            )
+
         logger.info("Miner running. Waiting for queries...")
         logger.info("Press Ctrl+C to stop")
 
@@ -112,12 +142,14 @@ def main():
     hotkey_name = os.getenv("HOTKEY_NAME", "default")
     netuid = int(os.getenv("NETUID", "1"))
     network = os.getenv("NETWORK", "finney")
+    chain_endpoint = os.getenv("CHAIN_ENDPOINT", None)
 
     miner = Miner(
         wallet_name=wallet_name,
         hotkey_name=hotkey_name,
         netuid=netuid,
         network=network,
+        chain_endpoint=chain_endpoint,
     )
 
     miner.run()
