@@ -39,12 +39,6 @@ class Operator(ABC):
 
 
 class EMAVolumeScorer(Operator):
-    """
-    Scoring formula:
-        Raw_Score = (Volume^0.7) * max(0, 1 + (Total_PnL / max(Volume, 1)))
-        Smoothed_Score = (1-a) * Previous_Score + a * Raw_Score
-    """
-
     name = "ema_volume"
     required_columns = (
         "hotkey",
@@ -54,11 +48,6 @@ class EMAVolumeScorer(Operator):
     )
 
     def __init__(self, alpha: float = EMA_ALPHA, volume_exp: float = VOLUME_EXPONENT):
-        """
-        Args:
-            alpha: EMA smoothing factor (0 to 1). Default is 12-hour half-life.
-            volume_exp: Exponent for volume scaling. <1 = sublinear (diminishing returns).
-        """
         self.alpha = alpha
         self.volume_exp = volume_exp
 
@@ -67,16 +56,6 @@ class EMAVolumeScorer(Operator):
         df: pd.DataFrame,
         previous_scores: Optional[Dict[str, float]] = None,
     ) -> OperatorResult:
-        """
-        Compute EMA-smoothed weights from validation data.
-
-        Args:
-            df: DataFrame with columns: hotkey, total_volume_usd, realized_profit_usd, unrealized_profit_usd
-            previous_scores: Dict mapping hotkey -> previous smoothed score
-
-        Returns:
-            OperatorResult with normalized weights and metadata
-        """
         df = self.preprocess(df)
 
         if previous_scores is None:
