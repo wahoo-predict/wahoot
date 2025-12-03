@@ -19,9 +19,6 @@ class ValidatorDB(ValidatorDBInterface):
         return get_or_create_database(self.db_path)
 
     def cache_validation_data(self, hotkey: str, data_dict: Dict[str, Any]) -> None:
-        """
-        Cache validation record for a hotkey.
-        """
         try:
             conn = self._get_conn()
             cursor = conn.cursor()
@@ -71,9 +68,6 @@ class ValidatorDB(ValidatorDBInterface):
     def get_cached_validation_data(
         self, hotkeys: Sequence[str], max_age_days: int = 7
     ) -> List[Dict[str, Any]]:
-        """
-        Retrieve latest cached data for hotkeys within max_age.
-        """
         if not hotkeys:
             return []
 
@@ -163,13 +157,6 @@ class ValidatorDB(ValidatorDBInterface):
                 (cutoff_date,),
             )
             deleted = cursor.rowcount
-
-            # NOTE: We need to keep scoring runs for EMA
-            # cursor.execute(
-            #     "DELETE FROM scoring_runs WHERE ts < ?",
-            #     (cutoff_date,),
-            # )
-
             conn.commit()
             conn.execute("VACUUM")
             conn.close()
@@ -182,9 +169,6 @@ class ValidatorDB(ValidatorDBInterface):
     def add_scoring_run(
         self, scores: Dict[str, float], reason: str = "ema_update"
     ) -> None:
-        """
-        Save EMA scores to DB.
-        """
         if not scores:
             return
 
@@ -209,9 +193,6 @@ class ValidatorDB(ValidatorDBInterface):
             logger.error(f"Failed to save scoring run: {e}")
 
     def get_latest_scores(self) -> Dict[str, float]:
-        """
-        Retrieve the most recent score for every hotkey.
-        """
         try:
             conn = self._get_conn()
             cursor = conn.cursor()

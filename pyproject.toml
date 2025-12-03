@@ -41,7 +41,7 @@ dev = [
 
 [project.scripts]
 wahoo-validator-init = "wahoo.validator.init:main"
-wahoo-validator = "wahoo.validator.validator:main"
+wahoo-validator = "wahoo.entrypoints.validator:main"
 
 [tool.setuptools]
 packages = ["wahoo"]
@@ -50,15 +50,4 @@ packages = ["wahoo"]
 line-length = 88
 target-version = ['py310', 'py311', 'py312']
 
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = "test_*.py"
-python_classes = "Test*"
-python_functions = "test_*"
-addopts = "-v --strict-markers --tb=short"
-
-[tool.pytest.ini_options.markers]
-unit = "Unit tests"
-integration = "Integration tests"
-slow = "Slow running tests"
 

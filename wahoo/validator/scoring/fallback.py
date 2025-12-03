@@ -5,13 +5,6 @@ logger = logging.getLogger(__name__)
 
 
 def get_fallback_weights_from_db(validator_db) -> Optional[Dict[str, float]]:
-    """
-    Args:
-        validator_db: ValidatorDB instance
-
-    Returns:
-        Dictionary of hotkey -> normalized weight, or None if no valid scores
-    """
     if validator_db is None:
         logger.warning("No validator DB available for fallback")
         return None

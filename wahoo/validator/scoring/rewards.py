@@ -4,8 +4,8 @@ import os
 import torch
 from typing import Dict, List, Optional, Any
 
-from wahoo.validator.utils.miners import build_uid_to_hotkey, is_valid_hotkey
-from wahoo.validator.models import ValidationRecord
+from ..utils.miners import build_uid_to_hotkey, is_valid_hotkey
+from ..models import ValidationRecord
 
 logger = logging.getLogger(__name__)
 

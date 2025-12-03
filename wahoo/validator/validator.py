@@ -21,19 +21,32 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 
+WAHOO_API_URL = "https://api.wahoopredict.com"
+WAHOO_VALIDATION_ENDPOINT = (
+    "https://api.wahoopredict.com/api/v2/event/bittensor/statistics"
+)
+
+BLOCK_TIME_SECONDS = 12.0
+
+
 def load_validator_config() -> Dict[str, Any]:
+    wallet_name = os.getenv("WALLET_NAME")
+    hotkey_name = os.getenv("HOTKEY_NAME")
+
+    if not wallet_name or not hotkey_name:
+        raise ValueError(
+            "WALLET_NAME and HOTKEY_NAME must be set via environment variables or CLI arguments. "
+            "Example: export WALLET_NAME=my_wallet HOTKEY_NAME=my_hotkey"
+        )
+
     return {
         "netuid": int(os.getenv("NETUID", "0")),
         "network": os.getenv("NETWORK", "finney"),
-        "wallet_name": os.getenv("WALLET_NAME", "default"),
-        "hotkey_name": os.getenv("HOTKEY_NAME", "default"),
-        "loop_interval": float(os.getenv("LOOP_INTERVAL", "100.0")),
+        "wallet_name": wallet_name,
+        "hotkey_name": hotkey_name,
         "use_validator_db": os.getenv("USE_VALIDATOR_DB", "false").lower() == "true",
-        "wahoo_api_url": os.getenv("WAHOO_API_URL", "https://api.wahoopredict.com"),
-        "wahoo_validation_endpoint": os.getenv(
-            "WAHOO_VALIDATION_ENDPOINT",
-            "https://api.wahoopredict.com/api/v2/event/bittensor/statistics",
-        ),
+        "wahoo_api_url": WAHOO_API_URL,
+        "wahoo_validation_endpoint": WAHOO_VALIDATION_ENDPOINT,
     }
 
 
@@ -54,14 +67,8 @@ def initialize_bittensor(
 
     try:
         if chain_endpoint:
-            # Use explicit chain endpoint (for local net or custom endpoints)
-            # Pass endpoint URL as network parameter
             subtensor = bt.subtensor(network=chain_endpoint)
             logger.info(f"Connected to subtensor at {chain_endpoint}")
-        elif network == "local":
-            # Default local endpoint
-            subtensor = bt.subtensor(network="ws://127.0.0.1:9945")
-            logger.info("Connected to local subtensor at ws://127.0.0.1:9945")
         else:
             subtensor = bt.subtensor(network=network)
             logger.info(f"Connected to subtensor on {network}")
@@ -77,7 +84,11 @@ def initialize_bittensor(
         raise
 
     try:
-        metagraph = bt.metagraph(netuid=netuid, network=network)
+        if chain_endpoint:
+            metagraph = bt.metagraph(netuid=netuid, network=chain_endpoint)
+        else:
+            metagraph = bt.metagraph(netuid=netuid, network=network)
+        # Sync metagraph to get latest network state
         metagraph.sync(subtensor=subtensor)
         logger.info(f"Metagraph synced: {len(metagraph.uids)} UIDs on subnet {netuid}")
     except Exception as e:
@@ -92,6 +103,35 @@ def sync_metagraph(metagraph: bt.Metagraph, subtensor: bt.Subtensor) -> bt.Metag
     metagraph.sync(subtensor=subtensor)
     logger.debug(f"Metagraph synced: {len(metagraph.uids)} total UIDs")
     return metagraph
+
+
+def calculate_loop_interval(metagraph: bt.Metagraph) -> float:
+    try:
+        if hasattr(metagraph, "tempo") and metagraph.tempo is not None:
+            tempo = int(metagraph.tempo)
+            interval = tempo * BLOCK_TIME_SECONDS * 1.1
+            logger.info(
+                f"Calculated loop interval from tempo: {tempo} blocks = {interval:.1f}s"
+            )
+            return max(interval, 60.0)
+        elif (
+            hasattr(metagraph, "blocks_per_epoch")
+            and metagraph.blocks_per_epoch is not None
+        ):
+            blocks_per_epoch = int(metagraph.blocks_per_epoch)
+            interval = blocks_per_epoch * BLOCK_TIME_SECONDS * 1.1
+            logger.info(
+                f"Calculated loop interval from blocks_per_epoch: "
+                f"{blocks_per_epoch} blocks = {interval:.1f}s"
+            )
+            return max(interval, 60.0)
+    except (AttributeError, TypeError, ValueError) as e:
+        logger.debug(f"Could not get tempo from metagraph: {e}")
+
+    logger.info(
+        "Using default loop interval: 100.0s (tempo not available from metagraph)"
+    )
+    return 100.0
 
 
 def query_miners(
@@ -133,20 +173,6 @@ def compute_weights(
     uid_to_hotkey: Dict[int, str],
     previous_scores: Optional[Dict[str, float]] = None,
 ) -> tuple[Dict[str, float], Dict[str, float]]:
-    """
-    Compute weights using EMAVolumeScorer operator.
-
-    Args:
-        validation_data: List of ValidationRecord objects
-        active_uids: List of active UIDs
-        uid_to_hotkey: Mapping from UID to hotkey
-        previous_scores: Previous EMA scores for continuity (hotkey -> score)
-
-    Returns:
-        Tuple of (weights_dict, updated_scores_dict) where:
-        - weights_dict: hotkey -> normalized weight (for rewards calculation)
-        - updated_scores_dict: hotkey -> new EMA score (for DB persistence)
-    """
     from .dataframe import records_to_dataframe
     from .scoring.operators import EMAVolumeScorer
 
@@ -195,7 +221,6 @@ def main_loop_iteration(
     logger.info("Starting main loop iteration")
     logger.info("=" * 70)
 
-    # Run cache cleanup periodically (every 10 iterations, ~16 minutes at 100s interval)
     if validator_db is not None and hasattr(validator_db, "cleanup_old_cache"):
         if iteration_count > 0 and iteration_count % 10 == 0:
             try:
@@ -381,199 +406,5 @@ def main_loop_iteration(
         logger.error(f"Error in main loop iteration: {e}", exc_info=True)
 
 
-def main() -> None:
-    import argparse
-
-    parser = argparse.ArgumentParser(
-        description="WaHoo Predict Bittensor Validator",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-
-    parser.add_argument(
-        "--netuid",
-        type=int,
-        default=int(os.getenv("NETUID", "1")),
-        help="Subnet UID",
-    )
-    parser.add_argument(
-        "--network",
-        type=str,
-        default=os.getenv("NETWORK", "finney"),
-        choices=["test", "finney", "local"],
-        help="Bittensor network (local, test, or finney). For local, can also use chain_endpoint.",
-    )
-    parser.add_argument(
-        "--chain-endpoint",
-        type=str,
-        default=os.getenv("CHAIN_ENDPOINT", None),
-        dest="chain_endpoint",
-        help="Chain endpoint URL (e.g., ws://127.0.0.1:9945 for local net). Overrides network if set.",
-    )
-
-    parser.add_argument(
-        "--wallet.name",
-        type=str,
-        default=os.getenv("WALLET_NAME", "default"),
-        dest="wallet_name",
-        help="Wallet name (coldkey)",
-    )
-    parser.add_argument(
-        "--wallet.hotkey",
-        type=str,
-        default=os.getenv("HOTKEY_NAME", "default"),
-        dest="hotkey_name",
-        help="Hotkey name",
-    )
-
-    parser.add_argument(
-        "--loop-interval",
-        type=float,
-        default=float(os.getenv("LOOP_INTERVAL", "100.0")),
-        dest="loop_interval",
-        help="Main loop interval in seconds",
-    )
-    parser.add_argument(
-        "--use-validator-db",
-        action="store_true",
-        default=os.getenv("USE_VALIDATOR_DB", "false").lower() == "true",
-        dest="use_validator_db",
-        help="Enable ValidatorDB caching",
-    )
-    parser.add_argument(
-        "--validator-db-path",
-        type=str,
-        default=os.getenv("VALIDATOR_DB_PATH", "validator.db"),
-        dest="validator_db_path",
-        help="Path to validator database",
-    )
-
-    parser.add_argument(
-        "--wahoo-api-url",
-        type=str,
-        default=os.getenv("WAHOO_API_URL", "https://api.wahoopredict.com"),
-        dest="wahoo_api_url",
-        help="WAHOO API base URL",
-    )
-    parser.add_argument(
-        "--wahoo-validation-endpoint",
-        type=str,
-        default=os.getenv(
-            "WAHOO_VALIDATION_ENDPOINT",
-            "https://api.wahoopredict.com/api/v2/event/bittensor/statistics",
-        ),
-        dest="wahoo_validation_endpoint",
-        help="WAHOO validation endpoint URL",
-    )
-
-    parser.add_argument(
-        "--log-level",
-        type=str,
-        default=os.getenv("LOG_LEVEL", "INFO"),
-        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
-        dest="log_level",
-        help="Logging level",
-    )
-
-    args = parser.parse_args()
-
-    log_level = getattr(logging, args.log_level.upper())
-    logging.basicConfig(
-        level=log_level,
-        format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-
-    logger.info("=" * 70)
-    logger.info("WaHoo Predict Validator")
-    logger.info("=" * 70)
-
-    from .database.validator_db import check_database_exists, get_db_path
-
-    db_path = get_db_path()
-    if not check_database_exists(db_path):
-        logger.info("First run detected - initializing database...")
-        try:
-            from .init import initialize
-
-            initialize(skip_deps=True, skip_db=False, db_path=str(db_path))
-            logger.info("✓ Database initialized successfully")
-        except Exception as e:
-            logger.warning(f"Auto-initialization failed: {e}")
-            logger.info("You can manually run: wahoo-validator-init")
-            logger.info("Continuing anyway...")
-
-    config = {
-        "netuid": args.netuid,
-        "network": args.network,
-        "wallet_name": args.wallet_name,
-        "hotkey_name": args.hotkey_name,
-        "loop_interval": args.loop_interval,
-        "use_validator_db": args.use_validator_db,
-        "wahoo_api_url": args.wahoo_api_url,
-        "wahoo_validation_endpoint": args.wahoo_validation_endpoint,
-        "chain_endpoint": args.chain_endpoint,
-    }
-
-    logger.info("Configuration:")
-    logger.info(f"  Network: {config['network']}")
-    logger.info(f"  Subnet UID: {config['netuid']}")
-    logger.info(f"  Wallet: {config['wallet_name']}/{config['hotkey_name']}")
-    logger.info(f"  Loop interval: {config['loop_interval']}s")
-    logger.info(f"  ValidatorDB: {config['use_validator_db']}")
-
-    try:
-        wallet, subtensor, dendrite, metagraph = initialize_bittensor(
-            wallet_name=config["wallet_name"],
-            hotkey_name=config["hotkey_name"],
-            netuid=config["netuid"],
-            network=config["network"],
-            chain_endpoint=config.get("chain_endpoint"),
-        )
-    except Exception as e:
-        logger.error(f"Failed to initialize Bittensor: {e}")
-        return
-
-    validator_db = None
-    if config["use_validator_db"]:
-        try:
-            from .database.core import ValidatorDB
-
-            validator_db = ValidatorDB(db_path=get_db_path())
-            logger.info(f"ValidatorDB initialized at {get_db_path()}")
-        except Exception as e:
-            logger.error(f"Failed to initialize ValidatorDB: {e}")
-            logger.warning("Continuing without database support")
-
-    logger.info("Entering main loop...")
-    logger.info(f"Loop interval: {config['loop_interval']}s")
-    logger.info("Press Ctrl+C to stop")
-
-    iteration_count = 0
-    try:
-        while True:
-            main_loop_iteration(
-                wallet=wallet,
-                subtensor=subtensor,
-                dendrite=dendrite,
-                metagraph=metagraph,
-                netuid=config["netuid"],
-                config=config,
-                validator_db=validator_db,
-                iteration_count=iteration_count,
-            )
-            iteration_count += 1
-
-            sleep_time = config["loop_interval"]
-            logger.info(f"Sleeping for {sleep_time}s before next iteration...")
-            time.sleep(sleep_time)
-
-    except KeyboardInterrupt:
-        logger.info("Received interrupt signal, shutting down...")
-    except Exception as e:
-        logger.error(f"Fatal error in main loop: {e}", exc_info=True)
-    finally:
-        logger.info("Validator stopped")
-
-
-if __name__ == "__main__":
-    main()
+# Main entry point moved to wahoo.entrypoints.validator
+# This module contains validator logic and orchestration functions

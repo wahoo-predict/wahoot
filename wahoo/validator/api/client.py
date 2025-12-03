@@ -280,20 +280,6 @@ class ValidatorDBInterface:
     def get_cached_validation_data(
         self, hotkeys: Sequence[str], max_age_days: int = 7
     ) -> List[Dict[str, Any]]:
-        """
-        Retrieve cached validation data for given hotkeys.
-
-        Args:
-            hotkeys: List of hotkeys to retrieve
-            max_age_days: Only return entries newer than this many days (default: 7)
-
-        Returns:
-            List of data dictionaries (one per hotkey)
-
-        Note:
-            Implementation should filter entries by timestamp to ensure
-            entries are newer than max_age_days before returning.
-        """
         raise NotImplementedError
 
     def delete_cached_validation_data(self, hotkeys: Sequence[str]) -> None:
