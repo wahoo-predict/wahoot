@@ -61,7 +61,7 @@ def initialize_bittensor(
         elif network == "local":
             # Default local endpoint
             subtensor = bt.subtensor(network="ws://127.0.0.1:9945")
-            logger.info(f"Connected to local subtensor at ws://127.0.0.1:9945")
+            logger.info("Connected to local subtensor at ws://127.0.0.1:9945")
         else:
             subtensor = bt.subtensor(network=network)
             logger.info(f"Connected to subtensor on {network}")

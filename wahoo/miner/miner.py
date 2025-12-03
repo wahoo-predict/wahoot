@@ -102,7 +102,7 @@ class Miner:
 
         logger.info("Starting axon server...")
         self.axon.start()
-        
+
         # Serve axon on blockchain so validators can find it
         logger.info("Serving axon on blockchain...")
         try:
@@ -113,7 +113,9 @@ class Miner:
             logger.info("✓ Axon served on blockchain")
         except Exception as e:
             logger.error(f"Failed to serve axon on blockchain: {e}")
-            logger.warning("Miner will continue but validators may not be able to find it")
+            logger.warning(
+                "Miner will continue but validators may not be able to find it"
+            )
 
         logger.info("Miner running. Waiting for queries...")
         logger.info("Press Ctrl+C to stop")
