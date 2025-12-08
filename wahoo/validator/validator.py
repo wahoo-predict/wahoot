@@ -6,11 +6,7 @@ from typing import Dict, List, Optional, Any
 import bittensor as bt
 from dotenv import load_dotenv
 
-from .api import (
-    get_active_event_id,
-    get_wahoo_validation_data,
-    should_skip_weight_computation,
-)
+from .api import get_active_event_id, get_wahoo_validation_data, should_skip_weight_computation
 from .blockchain import set_weights_with_retry
 from .scoring.rewards import reward
 from .utils.miners import build_uid_to_hotkey, get_active_uids
@@ -141,8 +137,13 @@ def query_miners(
     event_id: str,
     timeout: float = 12.0,
 ) -> List[WAHOOPredict]:
+    """
+    Query miners via dendrite. 
+    Note: In this subnet, miners may not run code, so this is a placeholder.
+    Returns empty responses if miners don't have valid axons.
+    """
     if not active_uids:
-        logger.warning("No active UIDs to query")
+        logger.debug("No active UIDs to query")
         return []
 
     logger.debug(
@@ -150,20 +151,46 @@ def query_miners(
         f"with timeout={timeout}s"
     )
 
-    axons = [metagraph.axons[uid] for uid in active_uids]
+    # Filter to only UIDs with valid axons (if any)
+    valid_axons = []
+    valid_uids = []
+    for uid in active_uids:
+        try:
+            if uid < len(metagraph.axons):
+                axon = metagraph.axons[uid]
+                # Check if axon has valid IP/port (optional check)
+                if hasattr(axon, "ip") and hasattr(axon, "port"):
+                    ip = str(axon.ip) if axon.ip else "0.0.0.0"
+                    port = int(axon.port) if axon.port else 0
+                    if ip != "0.0.0.0" and port > 0:
+                        valid_axons.append(axon)
+                        valid_uids.append(uid)
+        except (IndexError, AttributeError, TypeError) as e:
+            logger.debug(f"UID {uid} has no valid axon: {e}")
+            continue
 
-    synapses = [WAHOOPredict(event_id=event_id) for _ in active_uids]
+    if not valid_axons:
+        logger.debug("No miners with valid axons to query (this is expected if miners don't run code)")
+        return [None] * len(active_uids)
+
+    synapses = [WAHOOPredict(event_id=event_id) for _ in valid_axons]
 
     try:
         responses = dendrite.query(
-            axons=axons,
+            axons=valid_axons,
             synapses=synapses,
             timeout=timeout,
         )
-        logger.info(f"Received {len(responses)} responses from miners")
-        return responses
+        logger.debug(f"Received {len(responses)} responses from {len(valid_axons)} miners with axons")
+        # Pad with None for UIDs without axons
+        full_responses = [None] * len(active_uids)
+        for i, uid in enumerate(valid_uids):
+            if uid in active_uids:
+                idx = active_uids.index(uid)
+                full_responses[idx] = responses[i] if i < len(responses) else None
+        return full_responses
     except Exception as e:
-        logger.error(f"Error querying miners: {e}")
+        logger.debug(f"Error querying miners (expected if miners don't run code): {e}")
         return [None] * len(active_uids)
 
 

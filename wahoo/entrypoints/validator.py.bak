@@ -30,6 +30,7 @@ def main() -> None:
         "--network",
         type=str,
         default=os.getenv("NETWORK", "finney"),
+        choices=["test", "finney"],
         help="Bittensor network (test or finney). Default: finney",
     )
     parser.add_argument(
@@ -81,28 +82,6 @@ def main() -> None:
         help="Logging level",
     )
 
-    parser.add_argument(
-        "--wahoo-api-url",
-        type=str,
-        default=os.getenv("WAHOO_API_URL", WAHOO_API_URL),
-        dest="wahoo_api_url",
-        help="WAHOO API URL (overrides default)",
-    )
-    parser.add_argument(
-        "--wahoo-validation-endpoint",
-        type=str,
-        default=os.getenv("WAHOO_VALIDATION_ENDPOINT", WAHOO_VALIDATION_ENDPOINT),
-        dest="wahoo_validation_endpoint",
-        help="WAHOO validation endpoint URL (overrides default)",
-    )
-    parser.add_argument(
-        "--loop-interval",
-        type=float,
-        default=None,
-        dest="loop_interval",
-        help="Override loop interval in seconds (default: calculated from metagraph)",
-    )
-
     args = parser.parse_args()
 
     log_level = getattr(logging, args.log_level.upper())
@@ -144,8 +123,8 @@ def main() -> None:
         "wallet_name": args.wallet_name,
         "hotkey_name": args.hotkey_name,
         "use_validator_db": args.use_validator_db,
-        "wahoo_api_url": args.wahoo_api_url,
-        "wahoo_validation_endpoint": args.wahoo_validation_endpoint,
+        "wahoo_api_url": WAHOO_API_URL,
+        "wahoo_validation_endpoint": WAHOO_VALIDATION_ENDPOINT,
         "chain_endpoint": args.chain_endpoint,
     }
 
@@ -168,14 +147,10 @@ def main() -> None:
         logger.error(f"Failed to initialize Bittensor: {e}")
         return
 
-    if args.loop_interval is not None:
-        loop_interval = args.loop_interval
-        logger.info(f"  Loop interval: {loop_interval:.1f}s (override from command line)")
-    else:
-        loop_interval = calculate_loop_interval(metagraph)
-        logger.info(
-            f"  Loop interval: {loop_interval:.1f}s (calculated from metagraph tempo)"
-        )
+    loop_interval = calculate_loop_interval(metagraph)
+    logger.info(
+        f"  Loop interval: {loop_interval:.1f}s (calculated from metagraph tempo)"
+    )
 
     validator_db = None
     if config["use_validator_db"]:
@@ -206,10 +181,7 @@ def main() -> None:
             )
             iteration_count += 1
 
-            if args.loop_interval is not None:
-                loop_interval = args.loop_interval
-            else:
-                loop_interval = calculate_loop_interval(metagraph)
+            loop_interval = calculate_loop_interval(metagraph)
             logger.info(f"Sleeping for {loop_interval:.1f}s before next iteration...")
             time.sleep(loop_interval)
 
