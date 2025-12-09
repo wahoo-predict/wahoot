@@ -1,6 +1,6 @@
 <div align="center">
 
-# WaHoo Predict
+# Wahooτ
 
 </div>
 
@@ -19,13 +19,13 @@
 
 ## 🎯 What Makes This Special?
 
-Picture this: You're already trading on prediction markets, making calls on whether your favorite team will win or if that political candidate will pull through. Now imagine getting **paid in TAO** just for doing what you're already doing. That's **WaHoo Predict** – we took the prediction markets you love and added a Bittensor rewards layer on top.
+Picture this: You're already trading on prediction markets, making calls on whether your favorite team will win or if that political candidate will pull through. Now imagine getting **paid in TAO** just for doing what you're already doing. That's **Wahooτ** – we took the prediction markets you love and added a Bittensor rewards layer on top.
 
 **No coding. No servers. No "wait, what's a Docker container?" moments.** Just trade, perform well, and watch the rewards come in.
 
-### What is WAHOO Predict? (The Fun Part)
+### What is Wahooτ? (The Fun Part)
 
-WAHOO Predict is where the action happens. While your friends are scrolling through stale news articles, you're trading on what people *actually* think is going to happen – in real-time. Politics, sports, economics, you name it. It's like having a front-row seat to the world's collective gut feeling, and you can bet on it.
+Wahooτ is where the action happens. While your friends are scrolling through stale news articles, you're trading on what people *actually* think is going to happen – in real-time. Politics, sports, economics, you name it. It's like having a front-row seat to the world's collective gut feeling, and you can bet on it.
 
 **Here's what makes it awesome:**
 - **Live markets** on literally everything – from "Will it rain tomorrow?" to "Will Bitcoin hit $100k?"
@@ -38,9 +38,9 @@ WAHOO Predict is where the action happens. While your friends are scrolling thro
 
 Okay, here's the deal: You don't need to understand blockchain, APIs, or any of that stuff. But if you're the curious type (we like you), here's what happens behind the curtain:
 
-1. **You register** – Link your Bittensor wallet to WAHOO (seriously, 2 minutes max)
-2. **You trade** – Do your thing on WAHOO Predict like you always do
-3. **We track** – Our validators peek at your performance through the WAHOO API (don't worry, it's all public data)
+1. **You register** – Link your Bittensor wallet to Wahooτ (seriously, 2 minutes max)
+2. **You trade** – Do your thing on Wahooτ like you always do
+3. **We track** – Our validators peek at your performance through the Wahooτ API (don't worry, it's all public data)
 4. **You get scored** – Based on how much you trade, how much you profit, and how often you're right
 5. **You earn TAO** – Rewards hit your wallet based on your actual trading chops
 
@@ -54,7 +54,7 @@ Here's what makes us different:
 
 - ✅ **Literally zero coding** – If you can click "Yes" or "No" on a prediction, you're qualified
 - ✅ **Real money, real performance** – We reward actual trading skills, not your ability to write a script
-- ✅ **Built on something that works** – WAHOO Predict is already live and thriving. We just added the rewards layer
+- ✅ **Built on something that works** – Wahooτ is already live and thriving. We just added the rewards layer
 - ✅ **Nothing to hide** – Your performance is public, so you can see exactly why you're earning what you're earning
 
 ---
@@ -65,7 +65,7 @@ Here's what makes us different:
 
 Here's the thing: Most Bittensor subnets make you feel like you need a PhD in computer science just to get started. We looked at that and thought, "That's dumb." So we fixed it.
 
-**No code. No servers. No "why is my terminal showing errors?" moments.** Just trade on WAHOO Predict like you normally would, and watch the TAO rewards show up in your wallet. It's that simple.
+**No code. No servers. No "why is my terminal showing errors?" moments.** Just trade on Wahooτ like you normally would, and watch the TAO rewards show up in your wallet. It's that simple.
 
 If you can make a prediction and click a button, you can mine. Period.
 
@@ -80,20 +80,27 @@ You'll need a Bittensor wallet with a hotkey. Never heard of that? Totally fine.
 Copy this. Paste it. Run it. Done:
 
 ```bash
-btcli wallet register --netuid <netuid>
+btcli wallet register --netuid 30
 ```
-
-That's literally it. You're now a miner. Told you it was easy.
 
 #### Step 3: Link Everything Together
 
-Pop over to [wahoopredict.com/miners](https://wahoopredict.com/miners) and fill out the form. Takes 30 seconds. We do all the crypto verification magic behind the scenes – you just click "Submit" and move on with your life.
+Pop over to [Wahooτ](https://wahoopredict.com/en/auth/login?tab=register) and create an account. After creating an account, be sure to [verify your email address](https://account.wahoopredict.com/en/settings) as well as [adding your registered Hotkey](https://account.wahoopredict.com/en/settings?tab=bittensor-wallet) to your account. Input yout hotkey as the wallet address and obtain a verification messsage and sign the message with your wallet hotkey using the following btcli command:
+
+```bash
+btcli wallet sign --use-hotkey \
+--wallet.name REGISTERED_WALLET \
+--wallet.hotkey REGISTERED_HOTKEY \
+--message "PASTE ENTIRE VERFICATION MESSAGE"
+```
+
+After receiving a Signature from `btcli`, input the signature within the appropriate field. Note that the verification message will expire after 5 minutes. OInce your hotkey is linked to your account and said hotkey is registered as a miner, you can start trading to earn Tao!
 
 ### Now the Fun Part: Trade and Earn
 
 Alright, here's where it gets good. Once you're set up, **just trade like you always do**:
 
-- Browse events at [wahoopredict.com/en/events](https://wahoopredict.com/en/events) – see what's hot
+- Browse events at [Wahooτ](https://wahoopredict.com/en/events) – see what's hot
 - Make your calls – Yes or No, that's it
 - Watch your positions – manage your trades, see how you're doing
 
@@ -104,18 +111,24 @@ Meanwhile, in the background, we're tracking:
 
 **The math is simple:** Good trades = Good rewards. Bad trades = Less rewards. It's all tied to your actual performance, not some made-up metric. No code to debug, no servers to restart, no headaches – just trade well and get paid.
 
+#### Step 4 (Optional): Create API keys
+
+Don't want to trade manually? Not a problem. The Wahooτ API provides live data on open markets as well as the ability to place trades. We'll leave this up to you to configure your own strategy or train a model based on the available data. Simply [generate an API key](https://account.wahoopredict.com/en/settings?tab=api-key-management) and keep your secret safe (this is used as your Authorization token in requests). 
+
+For more information about the available endpoints, please refer to Wahooτ's [official API documentation](https://wahoopredict.gitbook.io/wahoopredict-docs/api/api-for-developers).
+
 ---
 
 ## 🛡️ Running a Validator? You're Our Hero
 
-Validators are the unsung heroes here. You're the ones making sure the best traders actually get rewarded for their skills. You pull real trading data from WAHOO Predict, evaluate everyone's performance, and make sure TAO rewards go to the right people. It's important work, and we appreciate you.
+Validators are the unsung heroes here. You're the ones making sure the best traders actually get rewarded for their skills. You pull real trading data from Wahooτ, evaluate everyone's performance, and make sure TAO rewards go to the right people. It's important work, and we appreciate you.
 
 ### Getting Started (The Quick Version)
 
 Same drill as miners, but you're a validator:
 
 ```bash
-btcli wallet register --netuid <netuid>
+btcli wallet register --netuid 30
 ```
 
 Make sure you've got the standard Bittensor validator requirements covered (stake weight, validator permit, all that jazz) and you're ready to roll.
@@ -125,7 +138,7 @@ Make sure you've got the standard Bittensor validator requirements covered (stak
 The validator runs a continuous loop that:
 
 1. **Syncs metagraph** – Gets current network state (active UIDs, hotkeys, axons)
-2. **Fetches WAHOO data** – Pulls trading stats from WAHOO API for all registered traders
+2. **Fetches Wahooτ data** – Pulls trading stats from Wahooτ API for all registered traders
 3. **Queries traders** – Requests predictions from active traders on the subnet
 4. **Calculates rewards** – Scores traders using EMA-based scoring (volume, profit, win rate)
 5. **Sets weights** – Posts weights to blockchain to distribute TAO rewards
@@ -153,7 +166,7 @@ We keep the scoring simple and transparent. Every miner gets evaluated on three 
 
 **Important Notes:**
 - **API endpoints are hardcoded** in the validator code (not configurable)
-  - WAHOO API: `https://api.wahoopredict.com`
+  - Wahooτ API: `https://api.wahoopredict.com`
   - Validation endpoint: `https://api.wahoopredict.com/api/v2/event/bittensor/statistics`
 - **Loop interval is automatically calculated** from metagraph tempo (synced with network)
   - Calculated as: `tempo * block_time * 1.1` (with 10% buffer)
@@ -289,7 +302,7 @@ LOG_LEVEL=INFO
 The validator will auto-initialize on first run, but you can manually initialize:
 
 ```bash
-wahoo-validator-init
+python -m wahoo.validator.init
 ```
 
 This sets up the database schema. The validator will auto-initialize if needed.
@@ -302,17 +315,24 @@ This sets up the database schema. The validator will auto-initialize if needed.
 # Make sure virtual environment is activated
 source .venv/bin/activate  # or: source venv/bin/activate
 
-# Start the validator
-wahoo-validator
+# Start the validator as a background processs
+nohup python -m wahoo.entrypoints.validator > wahoo-validator.log 2>&1 &
 ```
 
 **Or with explicit arguments:**
 ```bash
-wahoo-validator \
+nohup python -m wahoo.entrypoints.validator \
   --wallet.name your_wallet_name \
   --wallet.hotkey your_hotkey_name \
   --netuid your_subnet_uid \
-  --network finney
+  --network finney \
+  > wahoo-validator.log 2>&1 &
+```
+
+If you want to use pm2 instead of nohup, then please use the following format:
+
+```bash
+pm2 start python2 --name wahoo-validator -- -m wahoo.entrypoints.validator
 ```
 
 The validator will:
@@ -331,7 +351,7 @@ The validator will:
 6. ✅ **Initializes ValidatorDB** (if `USE_VALIDATOR_DB=true`) for caching and EMA score persistence
 7. ✅ **Enters main loop** - continuously:
    - Syncs metagraph each iteration
-   - Fetches trading data from WAHOO API for all registered traders
+   - Fetches trading data from Wahooτ API for all registered traders
    - Caches validation data in database (if enabled)
    - Queries traders for predictions
    - Calculates rewards using EMA-based scoring
@@ -352,7 +372,7 @@ The validator will:
 
 **Important Prerequisites:**
 - ✅ Bittensor wallet created (`btcli wallet new_coldkey` and `btcli wallet new_hotkey`)
-- ✅ Validator registered on the subnet (`btcli wallet register --netuid <netuid>`)
+- ✅ Validator registered on the subnet (`btcli wallet register --netuid 30`)
 - ✅ `WALLET_NAME` and `HOTKEY_NAME` set (via environment variables or CLI arguments)
 - ✅ `NETUID` set to your subnet UID
 
@@ -423,7 +443,7 @@ The validator uses SQLite for local data persistence:
 - **Per-validator**: Each validator gets their own database file (set `VALIDATOR_DB_PATH` for custom location)
 - **Synchronous**: Uses `sqlite3` (standard library, blocking operations - no async)
 - **Features**:
-  - Caches validation data from WAHOO API (reduces API calls)
+  - Caches validation data from Wahooτ API (reduces API calls)
   - Stores EMA scores for persistence across restarts
   - Automatic cleanup of old cache entries (7 days default)
   - WAL mode enabled for better write concurrency
@@ -452,22 +472,17 @@ pip install -e ".[dev]"
 Got questions? Want to dive deeper? Here's where to go:
 
 - **Ready to trade?** Head to [wahoopredict.com](https://wahoopredict.com/en/events) and see what's happening
-- **Want to understand WAHOO better?** The [WAHOO docs](https://wahoopredict.gitbook.io/wahoopredict-docs/getting-started/what-is-wahoopredict) will fill you in
+- **Want to understand Wahooτ better?** The [Wahooτ docs](https://wahoopredict.gitbook.io/wahoopredict-docs/getting-started/what-is-wahoopredict) will fill you in
 - **Bittensor Networks**: Learn about mainnet, testnet, and network endpoints at [Bittensor Networks Documentation](https://docs.learnbittensor.org/concepts/bittensor-networks)
 - **Bittensor CLI**: Full reference at [BTCLI Documentation](https://docs.learnbittensor.org/btcli/btcli)
 - **New to Bittensor?** The [official Bittensor docs](https://docs.bittensor.com) are your friend
 
-Still have questions? That's cool. We're here to help make this as simple as possible.
+Still have questions? That's cool. We're here to help make this as simple as possible. Assistance will be provided via our subnet channel on the [official Bittensor Discord](https://discord.gg/bittensor)
 
 ---
 
 ## 📄 License
 
-MIT License - see LICENSE file for details. TL;DR: Use it, build on it, make it better.
+MIT License - see LICENSE file for details.
 
 ---
-
-<div align="center">
-
-
-</div>
