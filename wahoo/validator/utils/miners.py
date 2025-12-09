@@ -16,11 +16,9 @@ def get_active_uids(metagraph: Any) -> List[int]:
         # Use metagraph.uids if available (all registered UIDs)
         if hasattr(metagraph, "uids") and metagraph.uids is not None:
             active_uids = list(metagraph.uids)
-            logger.info(
-                f"Found {len(active_uids)} registered UIDs from metagraph.uids"
-            )
+            logger.info(f"Found {len(active_uids)} registered UIDs from metagraph.uids")
             return active_uids
-        
+
         # Fallback: use hotkeys length if uids not available
         if hasattr(metagraph, "hotkeys") and metagraph.hotkeys is not None:
             active_uids = list(range(len(metagraph.hotkeys)))
@@ -28,14 +26,13 @@ def get_active_uids(metagraph: Any) -> List[int]:
                 f"Found {len(active_uids)} registered UIDs from metagraph.hotkeys (fallback)"
             )
             return active_uids
-        
+
         logger.warning("Metagraph does not have 'uids' or 'hotkeys' attribute")
         return active_uids
 
     except Exception as e:
         logger.error(f"Error getting active UIDs from metagraph: {e}")
         return []
-
 
 
 def is_valid_hotkey(hotkey: Optional[str]) -> bool:

@@ -238,28 +238,24 @@ def get_active_event_id(
 
     try:
         import json
+
         request_body = {
             "page": 1,
             "limit": 20,
-            "sort": {
-                "sortBy": "estimatedEnd",
-                "sortOrder": "desc"
-            },
-            "filter": {
-                "status": ["LIVE"]
-            }
+            "sort": {"sortBy": "estimatedEnd", "sortOrder": "desc"},
+            "filter": {"status": ["LIVE"]},
         }
-        
+
         with httpx.Client(timeout=timeout) as client:
             response = client.post(
                 events_url,
                 headers={"Content-Type": "application/json"},
-                content=json.dumps(request_body)
+                content=json.dumps(request_body),
             )
             response.raise_for_status()
 
             data = response.json()
-            
+
             # Handle list response - get first LIVE event
             if isinstance(data, list) and len(data) > 0:
                 first_event = data[0]
@@ -271,11 +267,15 @@ def get_active_event_id(
                 if event_id:
                     bt.logging.info(f"Retrieved active event_id: {event_id}")
                     return str(event_id)
-            
+
             # Handle dict response (fallback)
             if isinstance(data, dict):
                 # Check if it's a paginated response with a data array
-                if "data" in data and isinstance(data["data"], list) and len(data["data"]) > 0:
+                if (
+                    "data" in data
+                    and isinstance(data["data"], list)
+                    and len(data["data"]) > 0
+                ):
                     first_event = data["data"][0]
                     event_id = (
                         first_event.get("id")
@@ -285,7 +285,7 @@ def get_active_event_id(
                     if event_id:
                         bt.logging.info(f"Retrieved active event_id: {event_id}")
                         return str(event_id)
-                
+
                 # Try direct fields
                 event_id = (
                     data.get("active_event_id")
