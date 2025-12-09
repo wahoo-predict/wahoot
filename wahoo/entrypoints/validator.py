@@ -170,7 +170,9 @@ def main() -> None:
 
     if args.loop_interval is not None:
         loop_interval = args.loop_interval
-        logger.info(f"  Loop interval: {loop_interval:.1f}s (override from command line)")
+        logger.info(
+            f"  Loop interval: {loop_interval:.1f}s (override from command line)"
+        )
     else:
         loop_interval = calculate_loop_interval(metagraph)
         logger.info(
