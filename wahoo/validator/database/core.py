@@ -16,9 +16,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_SNAPSHOT_RETENTION_DAYS = int(
     os.getenv("VALIDATOR_SNAPSHOT_RETENTION_DAYS", "3")
 )
-DEFAULT_SCORING_RETENTION_DAYS = int(
-    os.getenv("VALIDATOR_SCORING_RETENTION_DAYS", "7")
-)
+DEFAULT_SCORING_RETENTION_DAYS = int(os.getenv("VALIDATOR_SCORING_RETENTION_DAYS", "7"))
 
 
 class ValidatorDB(ValidatorDBInterface):
@@ -163,11 +161,11 @@ class ValidatorDB(ValidatorDBInterface):
     ) -> Dict[str, int]:
         """
         Clean up old database entries automatically.
-        
+
         Args:
             snapshot_retention_days: Days to keep performance_snapshots (default: 3)
             scoring_retention_days: Days to keep scoring_runs (default: 7)
-            
+
         Returns:
             Dict with 'snapshots_deleted' and 'scoring_runs_deleted' counts
         """

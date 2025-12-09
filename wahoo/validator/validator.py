@@ -6,7 +6,11 @@ from typing import Dict, List, Optional, Any
 import bittensor as bt
 from dotenv import load_dotenv
 
-from .api import get_active_event_id, get_wahoo_validation_data, should_skip_weight_computation
+from .api import (
+    get_active_event_id,
+    get_wahoo_validation_data,
+    should_skip_weight_computation,
+)
 from .blockchain import set_weights_with_retry
 from .scoring.rewards import reward
 from .utils.miners import build_uid_to_hotkey, get_active_uids
@@ -138,7 +142,7 @@ def query_miners(
     timeout: float = 12.0,
 ) -> List[WAHOOPredict]:
     """
-    Query miners via dendrite. 
+    Query miners via dendrite.
     Note: In this subnet, miners may not run code, so this is a placeholder.
     Returns empty responses if miners don't have valid axons.
     """
@@ -170,7 +174,9 @@ def query_miners(
             continue
 
     if not valid_axons:
-        logger.debug("No miners with valid axons to query (this is expected if miners don't run code)")
+        logger.debug(
+            "No miners with valid axons to query (this is expected if miners don't run code)"
+        )
         return [None] * len(active_uids)
 
     synapses = [WAHOOPredict(event_id=event_id) for _ in valid_axons]
@@ -181,7 +187,9 @@ def query_miners(
             synapses=synapses,
             timeout=timeout,
         )
-        logger.debug(f"Received {len(responses)} responses from {len(valid_axons)} miners with axons")
+        logger.debug(
+            f"Received {len(responses)} responses from {len(valid_axons)} miners with axons"
+        )
         # Pad with None for UIDs without axons
         full_responses = [None] * len(active_uids)
         for i, uid in enumerate(valid_uids):

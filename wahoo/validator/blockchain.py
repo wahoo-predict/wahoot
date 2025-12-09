@@ -22,7 +22,7 @@ def set_weights_with_retry(
     global _last_successful_block, _last_cooldown_log_block
     max_attempts = max_retries + 1
     attempt = 0
-    
+
     # Get current block number
     current_block = None
     try:
@@ -69,24 +69,33 @@ def set_weights_with_retry(
                 else:
                     # Check if it's a "too soon" cooldown message
                     message_lower = message.lower() if message else ""
-                    if "too soon" in message_lower or "no attempt made" in message_lower:
+                    if (
+                        "too soon" in message_lower
+                        or "no attempt made" in message_lower
+                    ):
                         # Calculate next commit window
                         next_commit_block = None
                         blocks_remaining = None
-                        if current_block is not None and _last_successful_block is not None:
+                        if (
+                            current_block is not None
+                            and _last_successful_block is not None
+                        ):
                             next_commit_block = _last_successful_block + commit_period
                             blocks_remaining = max(0, next_commit_block - current_block)
-                        
+
                         # Only log cooldown message once per block or when it changes significantly
                         should_log = False
                         if current_block is not None:
-                            if _last_cooldown_log_block is None or _last_cooldown_log_block != current_block:
+                            if (
+                                _last_cooldown_log_block is None
+                                or _last_cooldown_log_block != current_block
+                            ):
                                 should_log = True
                                 _last_cooldown_log_block = current_block
                         else:
                             # If we can't get block number, log at DEBUG level to reduce noise
                             should_log = True
-                        
+
                         if should_log:
                             if blocks_remaining is not None and blocks_remaining > 0:
                                 logger.debug(
@@ -95,9 +104,9 @@ def set_weights_with_retry(
                                 )
                             else:
                                 logger.debug(
-                                    f"Weights on cooldown. This is normal - weights can only be committed periodically."
+                                    "Weights on cooldown. This is normal - weights can only be committed periodically."
                                 )
-                        
+
                         # Return None, True to indicate it's not an error, just waiting
                         return None, True
                     else:
