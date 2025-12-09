@@ -141,8 +141,13 @@ def query_miners(
     event_id: str,
     timeout: float = 12.0,
 ) -> List[WAHOOPredict]:
+    """
+    Query miners via dendrite.
+    Note: In this subnet, miners may not run code, so this is a placeholder.
+    Returns empty responses if miners don't have valid axons.
+    """
     if not active_uids:
-        logger.warning("No active UIDs to query")
+        logger.debug("No active UIDs to query")
         return []
 
     logger.debug(
@@ -150,20 +155,50 @@ def query_miners(
         f"with timeout={timeout}s"
     )
 
-    axons = [metagraph.axons[uid] for uid in active_uids]
+    # Filter to only UIDs with valid axons (if any)
+    valid_axons = []
+    valid_uids = []
+    for uid in active_uids:
+        try:
+            if uid < len(metagraph.axons):
+                axon = metagraph.axons[uid]
+                # Check if axon has valid IP/port (optional check)
+                if hasattr(axon, "ip") and hasattr(axon, "port"):
+                    ip = str(axon.ip) if axon.ip else "0.0.0.0"
+                    port = int(axon.port) if axon.port else 0
+                    if ip != "0.0.0.0" and port > 0:
+                        valid_axons.append(axon)
+                        valid_uids.append(uid)
+        except (IndexError, AttributeError, TypeError) as e:
+            logger.debug(f"UID {uid} has no valid axon: {e}")
+            continue
 
-    synapses = [WAHOOPredict(event_id=event_id) for _ in active_uids]
+    if not valid_axons:
+        logger.debug(
+            "No miners with valid axons to query (this is expected if miners don't run code)"
+        )
+        return [None] * len(active_uids)
+
+    synapses = [WAHOOPredict(event_id=event_id) for _ in valid_axons]
 
     try:
         responses = dendrite.query(
-            axons=axons,
+            axons=valid_axons,
             synapses=synapses,
             timeout=timeout,
         )
-        logger.info(f"Received {len(responses)} responses from miners")
-        return responses
+        logger.debug(
+            f"Received {len(responses)} responses from {len(valid_axons)} miners with axons"
+        )
+        # Pad with None for UIDs without axons
+        full_responses = [None] * len(active_uids)
+        for i, uid in enumerate(valid_uids):
+            if uid in active_uids:
+                idx = active_uids.index(uid)
+                full_responses[idx] = responses[i] if i < len(responses) else None
+        return full_responses
     except Exception as e:
-        logger.error(f"Error querying miners: {e}")
+        logger.debug(f"Error querying miners (expected if miners don't run code): {e}")
         return [None] * len(active_uids)
 
 
@@ -221,17 +256,23 @@ def main_loop_iteration(
     logger.info("Starting main loop iteration")
     logger.info("=" * 70)
 
+    # Automatic database cleanup (runs every iteration for active maintenance)
+    # Keeps 3 days of performance snapshots (EMA only needs latest, but buffer for debugging)
+    # Keeps 7 days of scoring runs (for historical analysis)
     if validator_db is not None and hasattr(validator_db, "cleanup_old_cache"):
-        if iteration_count > 0 and iteration_count % 10 == 0:
-            try:
-                deleted_count = validator_db.cleanup_old_cache(max_age_days=7)
-                if deleted_count > 0:
-                    logger.info(
-                        f"Cache cleanup: Deleted {deleted_count} old cache entries "
-                        f"(older than 7 days)"
-                    )
-            except Exception as cleanup_error:
-                logger.warning(f"Cache cleanup failed: {cleanup_error}")
+        try:
+            cleanup_result = validator_db.cleanup_old_cache()
+            if (
+                cleanup_result.get("snapshots_deleted", 0) > 0
+                or cleanup_result.get("scoring_runs_deleted", 0) > 0
+            ):
+                logger.info(
+                    f"Database cleanup: Deleted {cleanup_result.get('snapshots_deleted', 0)} "
+                    f"old snapshots and {cleanup_result.get('scoring_runs_deleted', 0)} "
+                    f"old scoring runs"
+                )
+        except Exception as cleanup_error:
+            logger.warning(f"Database cleanup failed: {cleanup_error}")
 
     try:
         logger.info("[1/9] Syncing metagraph...")
@@ -382,7 +423,7 @@ def main_loop_iteration(
                 uids=active_uids,
                 weights=rewards,
             )
-            if success:
+            if success and transaction_hash:
                 # Enhanced logging for successful weight setting
                 logger.info("=" * 70)
                 logger.info("✓✓✓ WEIGHTS SET SUCCESSFULLY ON BLOCKCHAIN ✓✓✓")
@@ -394,6 +435,10 @@ def main_loop_iteration(
                     logger.info(f"  UID {uid}: {weight:.6f} ({weight*100:.2f}%)")
                 logger.info(f"Total Weight Sum: {rewards.sum().item():.6f}")
                 logger.info("=" * 70)
+            elif success and not transaction_hash:
+                # Cooldown period - not an error, just waiting
+                # Logging is handled in blockchain.py at DEBUG level
+                pass
             else:
                 logger.warning("Failed to set weights (will retry next iteration)")
         except Exception as e:

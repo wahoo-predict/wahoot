@@ -5,33 +5,29 @@ logger = logging.getLogger(__name__)
 
 
 def get_active_uids(metagraph: Any) -> List[int]:
+    """
+    Get all registered UIDs from the metagraph.
+    In this subnet, miners are not required to run code or set axon info,
+    so we return all registered UIDs rather than filtering by axon IP/port.
+    """
     active_uids: List[int] = []
 
     try:
-        if not hasattr(metagraph, "axons"):
-            logger.warning("Metagraph does not have 'axons' attribute")
+        # Use metagraph.uids if available (all registered UIDs)
+        if hasattr(metagraph, "uids") and metagraph.uids is not None:
+            active_uids = list(metagraph.uids)
+            logger.info(f"Found {len(active_uids)} registered UIDs from metagraph.uids")
             return active_uids
 
-        for uid in range(len(metagraph.axons)):
-            try:
-                axon = metagraph.axons[uid]
+        # Fallback: use hotkeys length if uids not available
+        if hasattr(metagraph, "hotkeys") and metagraph.hotkeys is not None:
+            active_uids = list(range(len(metagraph.hotkeys)))
+            logger.info(
+                f"Found {len(active_uids)} registered UIDs from metagraph.hotkeys (fallback)"
+            )
+            return active_uids
 
-                if hasattr(axon, "ip") and hasattr(axon, "port"):
-                    ip = str(axon.ip)
-                    port = int(axon.port) if axon.port else 0
-
-                    if ip != "0.0.0.0" and port > 0:
-                        active_uids.append(uid)
-                else:
-                    logger.debug(f"UID {uid} axon missing ip or port attributes")
-
-            except (IndexError, AttributeError, ValueError, TypeError) as e:
-                logger.debug(f"Error checking UID {uid} axon: {e}")
-                continue
-
-        logger.info(
-            f"Found {len(active_uids)} active UIDs out of {len(metagraph.axons)} total"
-        )
+        logger.warning("Metagraph does not have 'uids' or 'hotkeys' attribute")
         return active_uids
 
     except Exception as e:

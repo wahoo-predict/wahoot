@@ -8,7 +8,13 @@ import pandas as pd
 
 from ..dataframe import ensure_required_columns
 
-HALF_LIFE_EPOCHS = 10
+# EMA half-life configuration
+# Validator runs every 72 minutes (360 blocks × 12 seconds per block = 4320 seconds)
+# For 12-hour EMA half-life: 12 hours = 43200 seconds
+# HALF_LIFE_EPOCHS = 43200 / 4320 = 10 epochs
+HALF_LIFE_SECONDS = 12 * 3600  # 12 hours in seconds
+EPOCH_INTERVAL_SECONDS = 360 * 12  # 360 blocks × 12 seconds per block = 4320 seconds
+HALF_LIFE_EPOCHS = int(HALF_LIFE_SECONDS / EPOCH_INTERVAL_SECONDS)  # 43200 / 4320 = 10
 EMA_ALPHA = 1 - (0.5 ** (1 / HALF_LIFE_EPOCHS))
 VOLUME_EXPONENT = 0.7
 MIN_VOLUME_THRESHOLD = 1.0
