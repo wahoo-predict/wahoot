@@ -1,4 +1,5 @@
 import logging
+import os
 import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -8,6 +9,16 @@ from ..api.client import ValidatorDBInterface
 from .validator_db import get_or_create_database
 
 logger = logging.getLogger(__name__)
+
+# Cleanup configuration (configurable via environment variables)
+# Performance snapshots: Keep 3 days (EMA only needs latest, but keep buffer for debugging/long predictions)
+# Scoring runs: Keep 7 days (for historical analysis and debugging)
+DEFAULT_SNAPSHOT_RETENTION_DAYS = int(
+    os.getenv("VALIDATOR_SNAPSHOT_RETENTION_DAYS", "3")
+)
+DEFAULT_SCORING_RETENTION_DAYS = int(
+    os.getenv("VALIDATOR_SCORING_RETENTION_DAYS", "7")
+)
 
 
 class ValidatorDB(ValidatorDBInterface):
@@ -145,26 +156,65 @@ class ValidatorDB(ValidatorDBInterface):
         except Exception as e:
             logger.error(f"Failed to delete cached data: {e}")
 
-    def cleanup_old_cache(self, max_age_days: int = 7) -> int:
+    def cleanup_old_cache(
+        self,
+        snapshot_retention_days: Optional[int] = None,
+        scoring_retention_days: Optional[int] = None,
+    ) -> Dict[str, int]:
+        """
+        Clean up old database entries automatically.
+        
+        Args:
+            snapshot_retention_days: Days to keep performance_snapshots (default: 3)
+            scoring_retention_days: Days to keep scoring_runs (default: 7)
+            
+        Returns:
+            Dict with 'snapshots_deleted' and 'scoring_runs_deleted' counts
+        """
+        if snapshot_retention_days is None:
+            snapshot_retention_days = DEFAULT_SNAPSHOT_RETENTION_DAYS
+        if scoring_retention_days is None:
+            scoring_retention_days = DEFAULT_SCORING_RETENTION_DAYS
+
+        result = {"snapshots_deleted": 0, "scoring_runs_deleted": 0}
+
         try:
             conn = self._get_conn()
             cursor = conn.cursor()
 
-            cutoff_date = (datetime.utcnow() - timedelta(days=max_age_days)).isoformat()
-
+            # Clean up old performance snapshots
+            snapshot_cutoff = (
+                datetime.utcnow() - timedelta(days=snapshot_retention_days)
+            ).isoformat()
             cursor.execute(
                 "DELETE FROM performance_snapshots WHERE timestamp < ?",
-                (cutoff_date,),
+                (snapshot_cutoff,),
             )
-            deleted = cursor.rowcount
+            result["snapshots_deleted"] = cursor.rowcount
+
+            # Clean up old scoring runs
+            scoring_cutoff = (
+                datetime.utcnow() - timedelta(days=scoring_retention_days)
+            ).isoformat()
+            cursor.execute(
+                "DELETE FROM scoring_runs WHERE ts < ?",
+                (scoring_cutoff,),
+            )
+            result["scoring_runs_deleted"] = cursor.rowcount
+
             conn.commit()
-            conn.execute("VACUUM")
+
+            # Run VACUUM to reclaim space (only if we deleted something)
+            if result["snapshots_deleted"] > 0 or result["scoring_runs_deleted"] > 0:
+                conn.execute("VACUUM")
+                conn.commit()
+
             conn.close()
 
-            return deleted
+            return result
         except Exception as e:
-            logger.error(f"Failed to cleanup cache: {e}")
-            return 0
+            logger.error(f"Failed to cleanup database: {e}")
+            return result
 
     def add_scoring_run(
         self, scores: Dict[str, float], reason: str = "ema_update"

@@ -147,7 +147,7 @@ We keep the scoring simple and transparent. Every miner gets evaluated on three 
 | `NETUID` | Subnet UID | **Required** |
 | `NETWORK` | Bittensor network (`finney` or `test`) | `finney` |
 | `USE_VALIDATOR_DB` | Enable database caching and EMA score persistence | `false` |
-| `VALIDATOR_DB_PATH` | Database file path (each validator gets their own) | `validator.db` |
+|  Database file path (each validator gets their own). | Database file path (each validator gets their own) | `~/.wahoo/validator.db` |
 | `CHAIN_ENDPOINT` | Custom chain endpoint URL | None (advanced use only) |
 | `LOG_LEVEL` | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) | `INFO` |
 
@@ -161,7 +161,7 @@ We keep the scoring simple and transparent. Every miner gets evaluated on three 
   - Falls back to 100 seconds if tempo unavailable
 - **Database auto-initializes** at validator start (schema created automatically)
   - Each validator gets their own database file
-  - Set `VALIDATOR_DB_PATH` to use a custom location
+  - Set  Database file path (each validator gets their own). to use a custom location
   - Database uses SQLite (synchronous, local file)
 
 ### Installation & Setup
@@ -277,7 +277,7 @@ HOTKEY_NAME=your_hotkey_name
 NETUID=your_subnet_uid
 NETWORK=finney
 USE_VALIDATOR_DB=true
-VALIDATOR_DB_PATH=validator.db  # Optional: custom path (each validator gets their own)
+VALIDATOR_DB_PATH=~/.wahoo/validator.db  # Optional: custom path (each validator gets their own)
 LOG_LEVEL=INFO
 
 # Note: Loop interval is auto-calculated from metagraph tempo
@@ -376,7 +376,7 @@ The validator requires the following environment variables or CLI arguments:
 **Optional:**
 - `NETWORK` - Bittensor network (`finney` for mainnet, `test` for testnet). Default: `finney`
 - `USE_VALIDATOR_DB` - Enable database caching and EMA score persistence (`true`/`false`). Default: `false`
-- `VALIDATOR_DB_PATH` - Path to validator database (each validator gets their own). Default: `validator.db`
+-  Database file path (each validator gets their own). - Path to validator database (each validator gets their own). Default: `~/.wahoo/validator.db`
 - `LOG_LEVEL` - Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`). Default: `INFO`
 - `CHAIN_ENDPOINT` - Custom chain endpoint URL (advanced use only)
 
@@ -420,7 +420,7 @@ The metagraph sync uses the Bittensor SDK's built-in syncing mechanism, which co
 The validator uses SQLite for local data persistence:
 
 - **Auto-initialization**: Database and schema are created automatically on first run
-- **Per-validator**: Each validator gets their own database file (set `VALIDATOR_DB_PATH` for custom location)
+- **Per-validator**: Each validator gets their own database file (set  Database file path (each validator gets their own). for custom location)
 - **Synchronous**: Uses `sqlite3` (standard library, blocking operations - no async)
 - **Features**:
   - Caches validation data from WAHOO API (reduces API calls)
@@ -429,9 +429,66 @@ The validator uses SQLite for local data persistence:
   - WAL mode enabled for better write concurrency
 
 **Database Location:**
-- Default: `validator.db` in project root
-- Custom: Set `VALIDATOR_DB_PATH` environment variable
-- Example: `export VALIDATOR_DB_PATH=/home/validator/my_validator.db`
+- Default: `~/.wahoo/validator.db` (user-specific, created automatically)
+- Custom: Set  Database file path (each validator gets their own). environment variable
+- Example: `export VALIDATOR_DB_PATH=./data/validator.db` (relative to project) or `/absolute/path/to/validator.db`
+
+
+#### Database Query Tool
+
+The validator includes a built-in database query tool for inspecting your validator's database:
+
+**Usage:**
+
+```bash
+# After installation, the tool is available as:
+wahoo-db-query <command> [options]
+
+# Or directly via Python:
+python -m wahoo.entrypoints.db_query <command> [options]
+```
+
+**Available Commands:**
+
+```bash
+# Show database statistics
+wahoo-db-query stats
+
+# List all registered miners
+wahoo-db-query miners
+
+# Show latest EMA scores (default: 20 most recent)
+wahoo-db-query scores
+wahoo-db-query scores --limit 50
+
+# Show latest score for each miner
+wahoo-db-query latest-scores
+
+# Show performance snapshots
+wahoo-db-query performance
+wahoo-db-query performance --hotkey <hotkey> --limit 20
+
+# Show detailed info for a specific miner
+wahoo-db-query miner <hotkey>
+```
+
+**Examples:**
+
+```bash
+# Quick database health check
+wahoo-db-query stats
+
+# See which miners are being actively scored
+wahoo-db-query latest-scores
+
+# Check a specific miner's trading performance
+wahoo-db-query miner 5EZ3Q91mFT8eRT6innXB8JVV8PLjvW8uDF85P6sF34WdxQwF
+
+# View recent scoring activity
+wahoo-db-query scores --limit 100
+```
+
+The tool automatically finds your validator database using the same logic as the validator itself (respects  Database file path (each validator gets their own). environment variable or uses the default location).
 
 #### Development Setup
 

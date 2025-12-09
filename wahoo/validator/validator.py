@@ -248,17 +248,23 @@ def main_loop_iteration(
     logger.info("Starting main loop iteration")
     logger.info("=" * 70)
 
+    # Automatic database cleanup (runs every iteration for active maintenance)
+    # Keeps 3 days of performance snapshots (EMA only needs latest, but buffer for debugging)
+    # Keeps 7 days of scoring runs (for historical analysis)
     if validator_db is not None and hasattr(validator_db, "cleanup_old_cache"):
-        if iteration_count > 0 and iteration_count % 10 == 0:
-            try:
-                deleted_count = validator_db.cleanup_old_cache(max_age_days=7)
-                if deleted_count > 0:
-                    logger.info(
-                        f"Cache cleanup: Deleted {deleted_count} old cache entries "
-                        f"(older than 7 days)"
-                    )
-            except Exception as cleanup_error:
-                logger.warning(f"Cache cleanup failed: {cleanup_error}")
+        try:
+            cleanup_result = validator_db.cleanup_old_cache()
+            if (
+                cleanup_result.get("snapshots_deleted", 0) > 0
+                or cleanup_result.get("scoring_runs_deleted", 0) > 0
+            ):
+                logger.info(
+                    f"Database cleanup: Deleted {cleanup_result.get('snapshots_deleted', 0)} "
+                    f"old snapshots and {cleanup_result.get('scoring_runs_deleted', 0)} "
+                    f"old scoring runs"
+                )
+        except Exception as cleanup_error:
+            logger.warning(f"Database cleanup failed: {cleanup_error}")
 
     try:
         logger.info("[1/9] Syncing metagraph...")
@@ -409,7 +415,7 @@ def main_loop_iteration(
                 uids=active_uids,
                 weights=rewards,
             )
-            if success:
+            if success and transaction_hash:
                 # Enhanced logging for successful weight setting
                 logger.info("=" * 70)
                 logger.info("✓✓✓ WEIGHTS SET SUCCESSFULLY ON BLOCKCHAIN ✓✓✓")
@@ -421,6 +427,10 @@ def main_loop_iteration(
                     logger.info(f"  UID {uid}: {weight:.6f} ({weight*100:.2f}%)")
                 logger.info(f"Total Weight Sum: {rewards.sum().item():.6f}")
                 logger.info("=" * 70)
+            elif success and not transaction_hash:
+                # Cooldown period - not an error, just waiting
+                # Logging is handled in blockchain.py at DEBUG level
+                pass
             else:
                 logger.warning("Failed to set weights (will retry next iteration)")
         except Exception as e:

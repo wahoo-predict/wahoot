@@ -42,6 +42,7 @@ dev = [
 [project.scripts]
 wahoo-validator-init = "wahoo.validator.init:main"
 wahoo-validator = "wahoo.entrypoints.validator:main"
+wahoo-db-query = "wahoo.entrypoints.db_query:main"
 
 [tool.setuptools]
 packages = ["wahoo"]
