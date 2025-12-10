@@ -42,7 +42,7 @@ Okay, here's the deal: You don't need to understand blockchain, APIs, or any of 
 2. **You trade** – Do your thing on Wahooτ like you always do
 3. **We track** – Our validators peek at your performance through the Wahooτ API (don't worry, it's all public data)
 4. **You get scored** – Based on how much you trade, how much you profit, and how often you're right
-5. **You earn TAO** – Rewards hit your wallet based on your actual trading chops
+5. **You earn Tao** – Rewards hit your miner wallet based on your actual trading chops
 
 **The formula is simple:** Better trades = More rewards. More trades = More rewards. It's all about your real performance, not some abstract code test.
 
@@ -65,7 +65,7 @@ Here's what makes us different:
 
 Here's the thing: Most Bittensor subnets make you feel like you need a PhD in computer science just to get started. We looked at that and thought, "That's dumb." So we fixed it.
 
-**No code. No servers. No "why is my terminal showing errors?" moments.** Just trade on Wahooτ like you normally would, and watch the TAO rewards show up in your wallet. It's that simple.
+**No code. No servers. No "why is my terminal showing errors?" moments.** Just trade on Wahooτ like you normally would, and watch the Tao rewards show up in your wallet. It's that simple.
 
 If you can make a prediction and click a button, you can mine. Period.
 
@@ -85,7 +85,7 @@ btcli wallet register --netuid 30
 
 #### Step 3: Link Everything Together
 
-Pop over to [Wahooτ](https://wahoopredict.com/en/auth/login?tab=register) and create an account. After creating an account, be sure to [verify your email address](https://account.wahoopredict.com/en/settings) as well as [adding your registered Hotkey](https://account.wahoopredict.com/en/settings?tab=bittensor-wallet) to your account. Input yout hotkey as the wallet address and obtain a verification messsage and sign the message with your wallet hotkey using the following btcli command:
+Pop over to [Wahooτ](https://wahoopredict.com/en/auth/login?tab=register) and create an account. After creating an account, be sure to [verify your email address](https://account.wahoopredict.com/en/settings) as well as [adding your registered Hotkey](https://account.wahoopredict.com/en/settings?tab=bittensor-wallet) to your account. Input your hotkey as the wallet address and obtain a verification messsage and sign the message with your wallet hotkey using the following btcli command:
 
 ```bash
 btcli wallet sign --use-hotkey \
@@ -94,7 +94,7 @@ btcli wallet sign --use-hotkey \
 --message "PASTE ENTIRE VERFICATION MESSAGE"
 ```
 
-After receiving a Signature from `btcli`, input the signature within the appropriate field. Note that the verification message will expire after 5 minutes. OInce your hotkey is linked to your account and said hotkey is registered as a miner, you can start trading to earn Tao!
+After receiving a Signature from `btcli`, input the signature within the appropriate field. Note that the verification message will expire after 5 minutes. Once your hotkey is linked to your account and said hotkey is registered as a miner, you can start trading to earn Tao!
 
 ### Now the Fun Part: Trade and Earn
 
@@ -109,7 +109,6 @@ Meanwhile, in the background, we're tracking:
 - **Your profits** → Making money? Get rewarded for it
 - **Your accuracy** → Right more often? That's worth something
 
-**The math is simple:** Good trades = Good rewards. Bad trades = Less rewards. It's all tied to your actual performance, not some made-up metric. No code to debug, no servers to restart, no headaches – just trade well and get paid.
 
 #### Step 4 (Optional): Create API keys
 
@@ -160,7 +159,7 @@ We keep the scoring simple and transparent. Every miner gets evaluated on three 
 | `NETUID` | Subnet UID | **Required** |
 | `NETWORK` | Bittensor network (`finney` or `test`) | `finney` |
 | `USE_VALIDATOR_DB` | Enable database caching and EMA score persistence | `false` |
-|  Database file path (each validator gets their own). | Database file path (each validator gets their own) | `~/.wahoo/validator.db` |
+| `VALIDATOR_DB_PATH` | Database file path (each validator gets their own) | `~/.wahoo/validator.db` |
 | `CHAIN_ENDPOINT` | Custom chain endpoint URL | None (advanced use only) |
 | `LOG_LEVEL` | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) | `INFO` |
 
@@ -174,8 +173,8 @@ We keep the scoring simple and transparent. Every miner gets evaluated on three 
   - Falls back to 100 seconds if tempo unavailable
 - **Database auto-initializes** at validator start (schema created automatically)
   - Each validator gets their own database file
-  - Set  Database file path (each validator gets their own). to use a custom location
-  - Database uses SQLite (synchronous, local file)
+  - Set `VALIDATOR_DB_PATH` environment variable to use a custom location
+  - Database uses SQLite with NORMAL synchronous mode (local file)
 
 ### Installation & Setup
 
@@ -251,52 +250,6 @@ pip install -e .  # Install production dependencies
 
 **Keys are stored in `~/.bittensor/wallets/`** - the validator loads them automatically.
 
-#### Environment Configuration
-
-**Required Environment Variables:**
-
-```bash
-# Set these in your shell or .env file
-export WALLET_NAME=your_wallet_name
-export HOTKEY_NAME=your_hotkey_name
-export NETUID=your_subnet_uid  # The subnet you're validating on
-
-# Network selection (default: finney/mainnet)
-export NETWORK=finney  # For mainnet (production)
-# OR
-export NETWORK=test    # For testnet (testing)
-```
-
-**Optional Environment Variables:**
-
-```bash
-# Database configuration
-export USE_VALIDATOR_DB=true  # Enable database caching and EMA score persistence (recommended)
-export VALIDATOR_DB_PATH=/path/to/validator.db  # Custom database path (each validator gets their own)
-
-# Logging
-export LOG_LEVEL=INFO  # DEBUG, INFO, WARNING, or ERROR
-
-# Note: Loop interval is automatically calculated from metagraph tempo
-# Note: API endpoints are hardcoded in the validator code
-```
-
-**Create a `.env` file** (optional, for convenience):
-
-```bash
-# .env file
-WALLET_NAME=your_wallet_name
-HOTKEY_NAME=your_hotkey_name
-NETUID=your_subnet_uid
-NETWORK=finney
-USE_VALIDATOR_DB=true
-VALIDATOR_DB_PATH=~/.wahoo/validator.db  # Optional: custom path (each validator gets their own)
-LOG_LEVEL=INFO
-
-# Note: Loop interval is auto-calculated from metagraph tempo
-# Note: API endpoints are hardcoded (not configurable)
-```
-
 #### Step 3: Initialize (Optional)
 
 The validator will auto-initialize on first run, but you can manually initialize:
@@ -332,14 +285,8 @@ nohup python -m wahoo.entrypoints.validator \
 If you want to use pm2 instead of nohup, then please use the following format:
 
 ```bash
-pm2 start python2 --name wahoo-validator -- -m wahoo.entrypoints.validator
+pm2 start python --name wahoo-validator -- -m wahoo.entrypoints.validator
 ```
-
-The validator will:
-- ✅ Auto-initialize database on first run (if needed)
-- ✅ Sync with metagraph automatically
-- ✅ Calculate loop interval from metagraph tempo
-- ✅ Start the main validation loop
 
 **What happens when you start:**
 
@@ -358,49 +305,20 @@ The validator will:
    - Persists EMA scores to database (if enabled)
    - Sets weights on blockchain
 
-**Network Selection:**
+**Network Selection:** Use `--network finney` for mainnet (production) or `--network test` for testnet (testing).
 
-- **Mainnet (Production)**: Use `--network finney` or `export NETWORK=finney`
-  - Connects to: `wss://entrypoint-finney.opentensor.ai:443`
-  - Real TAO rewards
-  - See [Bittensor Networks](https://docs.learnbittensor.org/concepts/bittensor-networks) for details
+**Prerequisites:** Bittensor wallet created and registered on subnet, with `WALLET_NAME`, `HOTKEY_NAME`, and `NETUID` configured.
 
-- **Testnet (Testing)**: Use `--network test` or `export NETWORK=test`
-  - Connects to: `wss://test.finney.opentensor.ai:443`
-  - Test TAO (no real value)
-  - Safe for testing
 
-**Important Prerequisites:**
-- ✅ Bittensor wallet created (`btcli wallet new_coldkey` and `btcli wallet new_hotkey`)
-- ✅ Validator registered on the subnet (`btcli wallet register --netuid 30`)
-- ✅ `WALLET_NAME` and `HOTKEY_NAME` set (via environment variables or CLI arguments)
-- ✅ `NETUID` set to your subnet UID
+---
 
-#### Troubleshooting
+### Troubleshooting
 
 **Issue: Dependencies fail to install**
 
 - Make sure you're in a virtual environment
 - Try running with elevated privileges: `sudo wahoo-validator-init`
 - Or manually install: `pip install -r requirements.txt` or `uv pip install -e .`
-
-#### Configuration
-
-The validator requires the following environment variables or CLI arguments:
-
-**Required:**
-- `WALLET_NAME` - Your Bittensor wallet name (coldkey)
-- `HOTKEY_NAME` - Your Bittensor hotkey name
-- `NETUID` - The subnet UID you're validating on
-
-**Optional:**
-- `NETWORK` - Bittensor network (`finney` for mainnet, `test` for testnet). Default: `finney`
-- `USE_VALIDATOR_DB` - Enable database caching and EMA score persistence (`true`/`false`). Default: `false`
--  Database file path (each validator gets their own). - Path to validator database (each validator gets their own). Default: `~/.wahoo/validator.db`
-- `LOG_LEVEL` - Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`). Default: `INFO`
-- `CHAIN_ENDPOINT` - Custom chain endpoint URL (advanced use only)
-
-**Note:** Loop interval is automatically calculated from metagraph tempo (not configurable). API endpoints are hardcoded in the validator code (not configurable).
 
 **Issue: Database errors**
 
@@ -420,38 +338,15 @@ The validator requires the following environment variables or CLI arguments:
 - Check that `wahoo/validator/database/alembic.ini` exists
 - Try manually running: `cd wahoo/validator/database && alembic upgrade head`
 
-#### Metagraph Syncing
-
-The validator automatically syncs with the Bittensor metagraph to stay current with network state:
-
-- **Initial sync**: Happens when validator starts (in `initialize_bittensor()`)
-- **Per-iteration sync**: Happens at the start of each main loop iteration
-- **What gets synced**: UIDs, hotkeys, axons, stake, tempo, and other network state
-
-This ensures the validator always has the latest network information before:
-- Querying traders
-- Calculating rewards
-- Setting weights on blockchain
-
-The metagraph sync uses the Bittensor SDK's built-in syncing mechanism, which connects to the appropriate network endpoint based on your `NETWORK` setting (`finney` for mainnet, `test` for testnet).
-
 #### Database
 
-The validator uses SQLite for local data persistence:
+The validator uses SQLite for local data persistence. Database auto-initializes on first run with schema creation. Features include:
+- Caches validation data from Wahooτ API (reduces API calls)
+- Stores EMA scores for persistence across restarts
+- Automatic cleanup of old cache entries (7 days default)
+- WAL mode enabled for better write concurrency
 
-- **Auto-initialization**: Database and schema are created automatically on first run
-- **Per-validator**: Each validator gets their own database file (set  Database file path (each validator gets their own). for custom location)
-- **Synchronous**: Uses `sqlite3` (standard library, blocking operations - no async)
-- **Features**:
-  - Caches validation data from Wahooτ API (reduces API calls)
-  - Stores EMA scores for persistence across restarts
-  - Automatic cleanup of old cache entries (7 days default)
-  - WAL mode enabled for better write concurrency
-
-**Database Location:**
-- Default: `~/.wahoo/validator.db` (user-specific, created automatically)
-- Custom: Set  Database file path (each validator gets their own). environment variable
-- Example: `export VALIDATOR_DB_PATH=./data/validator.db` (relative to project) or `/absolute/path/to/validator.db`
+Default location: `~/.wahoo/validator.db`. Set `VALIDATOR_DB_PATH` environment variable for custom location.
 
 
 #### Database Query Tool

@@ -256,7 +256,6 @@ def get_active_event_id(
 
             data = response.json()
 
-            # Handle list response - get first LIVE event
             if isinstance(data, list) and len(data) > 0:
                 first_event = data[0]
                 event_id = (
@@ -268,9 +267,7 @@ def get_active_event_id(
                     bt.logging.info(f"Retrieved active event_id: {event_id}")
                     return str(event_id)
 
-            # Handle dict response (fallback)
             if isinstance(data, dict):
-                # Check if it's a paginated response with a data array
                 if (
                     "data" in data
                     and isinstance(data["data"], list)
@@ -286,7 +283,6 @@ def get_active_event_id(
                         bt.logging.info(f"Retrieved active event_id: {event_id}")
                         return str(event_id)
 
-                # Try direct fields
                 event_id = (
                     data.get("active_event_id")
                     or data.get("event_id")
@@ -451,7 +447,6 @@ def get_wahoo_validation_data(
 
             if validator_db is not None:
                 try:
-                    # Get cached data (ValidatorDB should filter by max_age_days=7)
                     cached_data = validator_db.get_cached_validation_data(
                         hotkeys=batch, max_age_days=7
                     )
@@ -461,11 +456,9 @@ def get_wahoo_validation_data(
 
                         for data_dict in cached_data:
                             try:
-                                # Validate cached JSON structure matches expected format
                                 record = ValidationRecord.model_validate(data_dict)
                                 cached_records.append(record)
                             except Exception as validation_error:
-                                # Track invalid entries for deletion
                                 hotkey = data_dict.get("hotkey", "unknown")
                                 invalid_hotkeys.append(hotkey)
                                 bt.logging.debug(
@@ -474,7 +467,6 @@ def get_wahoo_validation_data(
                                 )
                                 continue
 
-                        # Delete invalid cache entries if ValidatorDB supports it
                         if invalid_hotkeys and hasattr(
                             validator_db, "delete_cached_validation_data"
                         ):
@@ -492,7 +484,6 @@ def get_wahoo_validation_data(
                                     f"{delete_error}"
                                 )
 
-                        # Log detailed cache fallback statistics
                         total_requested = len(batch)
                         total_cached = len(cached_data)
                         valid_cached = len(cached_records)
