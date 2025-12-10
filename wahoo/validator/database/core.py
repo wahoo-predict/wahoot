@@ -10,9 +10,6 @@ from .validator_db import get_or_create_database
 
 logger = logging.getLogger(__name__)
 
-# Cleanup configuration (configurable via environment variables)
-# Performance snapshots: Keep 3 days (EMA only needs latest, but keep buffer for debugging/long predictions)
-# Scoring runs: Keep 7 days (for historical analysis and debugging)
 DEFAULT_SNAPSHOT_RETENTION_DAYS = int(
     os.getenv("VALIDATOR_SNAPSHOT_RETENTION_DAYS", "3")
 )
@@ -180,7 +177,6 @@ class ValidatorDB(ValidatorDBInterface):
             conn = self._get_conn()
             cursor = conn.cursor()
 
-            # Clean up old performance snapshots
             snapshot_cutoff = (
                 datetime.utcnow() - timedelta(days=snapshot_retention_days)
             ).isoformat()
@@ -190,7 +186,6 @@ class ValidatorDB(ValidatorDBInterface):
             )
             result["snapshots_deleted"] = cursor.rowcount
 
-            # Clean up old scoring runs
             scoring_cutoff = (
                 datetime.utcnow() - timedelta(days=scoring_retention_days)
             ).isoformat()
@@ -202,7 +197,6 @@ class ValidatorDB(ValidatorDBInterface):
 
             conn.commit()
 
-            # Run VACUUM to reclaim space (only if we deleted something)
             if result["snapshots_deleted"] > 0 or result["scoring_runs_deleted"] > 0:
                 conn.execute("VACUUM")
                 conn.commit()

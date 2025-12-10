@@ -7,15 +7,12 @@ from typing import Optional
 def get_db_path() -> Path:
     db_path = os.getenv("VALIDATOR_DB_PATH")
     if db_path:
-        # User provided explicit path
         db_path = Path(db_path)
         if not db_path.is_absolute():
-            # Relative path: resolve from project root
             project_root = Path(__file__).parent.parent.parent.parent
             db_path = project_root / db_path
         return db_path
     else:
-        # Default: use ~/.wahoo/validator.db (user-specific, not in project root)
         home_dir = Path.home()
         wahoo_dir = home_dir / ".wahoo"
         wahoo_dir.mkdir(parents=True, exist_ok=True)

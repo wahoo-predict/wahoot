@@ -48,7 +48,6 @@ def set_weights_with_retry(
                 weights=weights,
             )
 
-            # Handle tuple return format (bool, str) from bittensor.subtensor.set_weights()
             if isinstance(result, tuple) and len(result) == 2:
                 success, message = result
                 if success:
@@ -61,19 +60,16 @@ def set_weights_with_retry(
                     try:
                         if hasattr(subtensor, "block"):
                             _last_successful_block = subtensor.block
-                            # Reset cooldown log tracking on successful commit
                             _last_cooldown_log_block = None
                     except Exception:
                         pass
                     return transaction_hash, True
                 else:
-                    # Check if it's a "too soon" cooldown message
                     message_lower = message.lower() if message else ""
                     if (
                         "too soon" in message_lower
                         or "no attempt made" in message_lower
                     ):
-                        # Calculate next commit window
                         next_commit_block = None
                         blocks_remaining = None
                         if (
@@ -83,7 +79,6 @@ def set_weights_with_retry(
                             next_commit_block = _last_successful_block + commit_period
                             blocks_remaining = max(0, next_commit_block - current_block)
 
-                        # Only log cooldown message once per block or when it changes significantly
                         should_log = False
                         if current_block is not None:
                             if (
@@ -93,7 +88,6 @@ def set_weights_with_retry(
                                 should_log = True
                                 _last_cooldown_log_block = current_block
                         else:
-                            # If we can't get block number, log at DEBUG level to reduce noise
                             should_log = True
 
                         if should_log:
@@ -107,10 +101,8 @@ def set_weights_with_retry(
                                     "Weights on cooldown. This is normal - weights can only be committed periodically."
                                 )
 
-                        # Return None, True to indicate it's not an error, just waiting
                         return None, True
                     else:
-                        # Actual failure
                         logger.warning(
                             f"set_weights() failed on attempt {attempt}/{max_attempts}: {message}"
                         )
@@ -123,7 +115,6 @@ def set_weights_with_retry(
                             return None, False
                         continue
 
-            # Handle other return formats (backward compatibility)
             transaction_hash: Optional[str] = None
             if isinstance(result, str):
                 transaction_hash = result
@@ -143,7 +134,6 @@ def set_weights_with_retry(
                 try:
                     if hasattr(subtensor, "block"):
                         _last_successful_block = subtensor.block
-                        # Reset cooldown log tracking on successful commit
                         _last_cooldown_log_block = None
                 except Exception:
                     pass

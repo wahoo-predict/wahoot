@@ -190,7 +190,6 @@ def query_miners(
         logger.debug(
             f"Received {len(responses)} responses from {len(valid_axons)} miners with axons"
         )
-        # Pad with None for UIDs without axons
         full_responses = [None] * len(active_uids)
         for i, uid in enumerate(valid_uids):
             if uid in active_uids:
@@ -256,9 +255,6 @@ def main_loop_iteration(
     logger.info("Starting main loop iteration")
     logger.info("=" * 70)
 
-    # Automatic database cleanup (runs every iteration for active maintenance)
-    # Keeps 3 days of performance snapshots (EMA only needs latest, but buffer for debugging)
-    # Keeps 7 days of scoring runs (for historical analysis)
     if validator_db is not None and hasattr(validator_db, "cleanup_old_cache"):
         try:
             cleanup_result = validator_db.cleanup_old_cache()
@@ -300,7 +296,6 @@ def main_loop_iteration(
             )
             logger.info(f"✓ Fetched validation data for {len(validation_data)} miners")
 
-            # Check if we should skip weight computation due to no usable data
             if should_skip_weight_computation(validation_data, log_reason=True):
                 logger.warning(
                     "No usable validation data available after API + cache fallback. "
@@ -321,7 +316,6 @@ def main_loop_iteration(
         except Exception as e:
             logger.error(f"Failed to fetch validation data: {e}")
             validation_data = []
-            # Check if we should skip after exception
             if should_skip_weight_computation(validation_data, log_reason=True):
                 logger.warning(
                     "No usable validation data after exception. "
@@ -352,7 +346,7 @@ def main_loop_iteration(
 
         if wahoo_weights is not None:
             logger.info("Using fallback weights from DB, skipping new computation")
-            updated_ema_scores = {}  # No new scores to save
+            updated_ema_scores = {}
         else:
             previous_ema_scores = {}
             if validator_db is not None:
@@ -424,7 +418,6 @@ def main_loop_iteration(
                 weights=rewards,
             )
             if success and transaction_hash:
-                # Enhanced logging for successful weight setting
                 logger.info("=" * 70)
                 logger.info("✓✓✓ WEIGHTS SET SUCCESSFULLY ON BLOCKCHAIN ✓✓✓")
                 logger.info("=" * 70)
@@ -436,8 +429,6 @@ def main_loop_iteration(
                 logger.info(f"Total Weight Sum: {rewards.sum().item():.6f}")
                 logger.info("=" * 70)
             elif success and not transaction_hash:
-                # Cooldown period - not an error, just waiting
-                # Logging is handled in blockchain.py at DEBUG level
                 pass
             else:
                 logger.warning("Failed to set weights (will retry next iteration)")
@@ -449,7 +440,3 @@ def main_loop_iteration(
 
     except Exception as e:
         logger.error(f"Error in main loop iteration: {e}", exc_info=True)
-
-
-# Main entry point moved to wahoo.entrypoints.validator
-# This module contains validator logic and orchestration functions

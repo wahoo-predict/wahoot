@@ -13,13 +13,11 @@ def get_active_uids(metagraph: Any) -> List[int]:
     active_uids: List[int] = []
 
     try:
-        # Use metagraph.uids if available (all registered UIDs)
         if hasattr(metagraph, "uids") and metagraph.uids is not None:
             active_uids = list(metagraph.uids)
             logger.info(f"Found {len(active_uids)} registered UIDs from metagraph.uids")
             return active_uids
 
-        # Fallback: use hotkeys length if uids not available
         if hasattr(metagraph, "hotkeys") and metagraph.hotkeys is not None:
             active_uids = list(range(len(metagraph.hotkeys)))
             logger.info(

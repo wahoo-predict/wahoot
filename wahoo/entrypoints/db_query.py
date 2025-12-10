@@ -1,9 +1,3 @@
-#!/usr/bin/env python3
-"""
-Built-in database query tool for WaHoo validator.
-Usage: python -m wahoo.entrypoints.db_query [command] [options]
-"""
-
 import argparse
 import sqlite3
 import sys
@@ -223,7 +217,6 @@ def show_volume():
     conn = connect_db()
     cursor = conn.cursor()
 
-    # Get latest performance snapshot for each miner
     cursor.execute(
         """
         SELECT ps.hotkey, ps.total_volume_usd, ps.trade_count, ps.timestamp, m.uid
@@ -380,22 +373,17 @@ def main():
 
     subparsers = parser.add_subparsers(dest="command", help="Command to execute")
 
-    # Stats command
     subparsers.add_parser("stats", help="Show database statistics")
 
-    # Miners command
     subparsers.add_parser("miners", help="List all registered miners")
 
-    # Scores command
     scores_parser = subparsers.add_parser("scores", help="Show latest EMA scores")
     scores_parser.add_argument(
         "--limit", type=int, default=20, help="Number of scores to show"
     )
 
-    # Latest scores command
     subparsers.add_parser("latest-scores", help="Show latest score for each miner")
 
-    # Performance command
     perf_parser = subparsers.add_parser(
         "performance", help="Show performance snapshots"
     )
