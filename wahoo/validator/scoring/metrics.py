@@ -370,7 +370,18 @@ def plot_score_trends_by_hotkey(
     output_path: Optional[Path] = None,
     figsize: Tuple[int, int] = (14, 8),
 ) -> Optional[Figure]:
-    
+    """
+    Plot score trends over time for top N miners.
+
+    Args:
+        df: DataFrame with score history (must have 'ts', 'hotkey', 'score' columns)
+        top_n: Number of top miners to plot
+        output_path: Optional path to save the plot
+        figsize: Figure size (width, height)
+
+    Returns:
+        matplotlib Figure if matplotlib is available, None otherwise
+    """
     if not HAS_MATPLOTLIB:
         logger.warning(
             "matplotlib is not installed. Install it to enable plotting functionality."
