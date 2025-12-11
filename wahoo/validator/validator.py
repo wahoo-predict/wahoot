@@ -126,7 +126,7 @@ def initialize_bittensor(
 ) -> tuple[bt.Wallet, bt.Subtensor, bt.Dendrite, bt.Metagraph]:
     logger.info("Initializing Bittensor components...")
     try:
-        wallet = bt.wallet(name=wallet_name, hotkey=hotkey_name)
+        wallet = bt.Wallet(name=wallet_name, hotkey=hotkey_name)
         logger.info(f"Loaded wallet: {wallet_name}/{hotkey_name}")
     except Exception as e:
         logger.error(f"Failed to load wallet: {e}")
@@ -134,17 +134,17 @@ def initialize_bittensor(
 
     try:
         if chain_endpoint:
-            subtensor = bt.subtensor(network=chain_endpoint)
+            subtensor = bt.Subtensor(network=chain_endpoint)
             logger.info(f"Connected to subtensor at {chain_endpoint}")
         else:
-            subtensor = bt.subtensor(network=network)
+            subtensor = bt.Subtensor(network=network)
             logger.info(f"Connected to subtensor on {network}")
     except Exception as e:
         logger.error(f"Failed to connect to subtensor: {e}")
         raise
 
     try:
-        dendrite = bt.dendrite(wallet=wallet)
+        dendrite = bt.Dendrite(wallet=wallet)
         logger.info("Dendrite initialized")
     except Exception as e:
         logger.error(f"Failed to initialize dendrite: {e}")
@@ -152,9 +152,9 @@ def initialize_bittensor(
 
     try:
         if chain_endpoint:
-            metagraph = bt.metagraph(netuid=netuid, network=chain_endpoint)
+            metagraph = bt.Metagraph(netuid=netuid, network=chain_endpoint)
         else:
-            metagraph = bt.metagraph(netuid=netuid, network=network)
+            metagraph = bt.Metagraph(netuid=netuid, network=network)
         # Sync metagraph to get latest network state
         metagraph.sync(subtensor=subtensor)
         logger.info(f"Metagraph synced: {len(metagraph.uids)} UIDs on subnet {netuid}")
