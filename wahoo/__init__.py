@@ -1,6 +1,6 @@
 from .validator.api.client import ValidationAPIClient, ValidationAPIError
-from .validator.models import PerformanceMetrics, ValidationRecord
-from .validator.dataframe import (
+from .validator.scoring.models import PerformanceMetrics, ValidationRecord
+from .validator.scoring.dataframe import (
     records_to_dataframe,
     ensure_required_columns,
     flatten_record,

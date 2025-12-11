@@ -4,8 +4,8 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence
 
 import numpy as np
 
-from ..dataframe import records_to_dataframe
-from ..models import ValidationRecord
+from .dataframe import records_to_dataframe
+from .models import ValidationRecord
 from .operators import Operator, OperatorResult
 
 

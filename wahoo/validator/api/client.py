@@ -11,7 +11,7 @@ import httpx
 from dotenv import load_dotenv
 from pydantic import ValidationError
 
-from ..models import ValidationRecord
+from ..scoring.models import ValidationRecord
 from .fallback import filter_usable_records
 
 load_dotenv()

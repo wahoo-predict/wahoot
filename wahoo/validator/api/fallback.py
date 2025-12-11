@@ -1,7 +1,7 @@
 import logging
 from typing import List, Optional
 
-from ..models import ValidationRecord
+from ..scoring.models import ValidationRecord
 
 logger = logging.getLogger(__name__)
 
