@@ -196,9 +196,9 @@ def calculate_loop_interval(metagraph: bt.Metagraph) -> float:
         logger.debug(f"Could not get tempo from metagraph: {e}")
 
     logger.info(
-        "Using default loop interval: 100.0s (tempo not available from metagraph)"
+        "Using default loop interval: 4800 seconds (tempo not available from metagraph)"
     )
-    return 100.0
+    return 4800.0
 
 
 def compute_weights(

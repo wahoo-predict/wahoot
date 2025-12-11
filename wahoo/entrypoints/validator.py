@@ -168,6 +168,8 @@ def main() -> None:
         logger.error(f"Failed to initialize Bittensor: {e}")
         return
 
+    # Calculate loop interval from metagraph if not provided
+    # Default behavior is to calculate from metagraph tempo
     if args.loop_interval is not None:
         loop_interval = args.loop_interval
         logger.info(
@@ -208,9 +210,9 @@ def main() -> None:
             )
             iteration_count += 1
 
-            if args.loop_interval is not None:
-                loop_interval = args.loop_interval
-            else:
+            # Recalculate loop interval from metagraph if not overridden
+            # This allows the interval to adapt if metagraph tempo changes
+            if args.loop_interval is None:
                 loop_interval = calculate_loop_interval(metagraph)
             logger.info(f"Sleeping for {loop_interval:.1f}s before next iteration...")
             time.sleep(loop_interval)
