@@ -25,7 +25,7 @@ You will need some TAO funded on your wallet in order to register to any subnet 
 After you fund your wallet with some TAO, you can run the following command to register your newly created wallet to Wahoo:
 
 ```bash
-btcli wallet register --netuid 30
+btcli subnets register --netuid 30 --wallet.name WALLET_NAME --hotkey WALLET_HOTKEY
 ```
 
 For more information about the available btcli commands and available arguments, please refer to the [btcli Reference Document](https://docs.learnbittensor.org/btcli)
