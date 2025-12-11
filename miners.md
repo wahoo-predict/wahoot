@@ -1,0 +1,66 @@
+### Look, We Made Mining Actually Accessible
+
+Here's the thing: Most Bittensor subnets make you feel like you need a PhD in computer science just to get started. We looked at that and thought, "That's dumb." So we fixed it.
+
+**No code. No servers. No "why is my terminal showing errors?" moments.** Just trade on Wahooτ like you normally would, and watch the Tao rewards show up in your wallet. It's that simple.
+
+If you can make a prediction and click a button, you can mine. Period.
+
+### Get Started in 3 Steps (Seriously, That's It)
+
+#### Step 1: Get Your Bittensor Wallet
+
+You'll need a Bittensor wallet with a hotkey. Never heard of that? Totally fine. The [official Bittensor docs](https://docs.learnbittensor.org/miners) have your back. It's basically like setting up any crypto wallet – follow the steps, and you're golden.
+
+Want more information or assistance on getting your wallet set up? The [Bittensor Community Discord server](https://discord.gg/bittensor) has you covered. After joining, we recommend familiarizing yourself with the [FAQ Channel](https://discord.com/channels/799672011265015819/1215386737661055056) for any initial questions regarding Bittensor. 
+
+**NOTE - scammers will attempt you contact you via Direct Messages posing as Moderators/Admins shortly after joining the server. Only communicate with individuals within the official server and NEVER provide your recovery phrase / wallet password to anybody.**
+
+#### Step 2: Register on Our Subnet
+
+You will need some TAO funded on your wallet in order to register to any subnet in Bittensor. For information on how to load TAO onto your wallet, please refer to [the following guide](https://discord.com/channels/799672011265015819/1411009572092776600).
+
+After you fund your wallet with some TAO, you can run the following command to register your newly created wallet to Wahooτ:
+
+```bash
+btcli wallet register --netuid 30
+```
+
+For more information about the available btcli commands and available arguments, please refer to the [btcli Reference Document](https://docs.learnbittensor.org/btcli)
+
+#### Step 3: Link Everything Together
+
+Pop over to [Wahooτ](https://wahoopredict.com/en/auth/login?tab=register) and create an account. After creating an account, be sure to [verify your email address](https://account.wahoopredict.com/en/settings) as well as [adding your registered Hotkey](https://account.wahoopredict.com/en/settings?tab=bittensor-wallet) to your account. 
+
+You will have to verify that you own the hotkey address you provided by signing a message with your hotkey. Input your hotkey as the wallet address and obtain a verification messsage and sign the message with your wallet hotkey using the following btcli command:
+
+```bash
+btcli wallet sign --use-hotkey \
+--wallet.name REGISTERED_WALLET \
+--wallet.hotkey REGISTERED_HOTKEY \
+--message "PASTE ENTIRE VERFICATION MESSAGE"
+```
+
+After receiving a Signature from `btcli`, input the signature within the appropriate field. Note that the verification message will expire after 5 minutes. Once your hotkey is linked to your account and said hotkey is registered as a miner, you can start trading to earn Tao!
+
+### Now the Fun Part: Trade and Earn
+
+Alright, here's where it gets good. Once you're set up, **just trade like you always do**:
+
+- Browse events at [Wahooτ](https://wahoopredict.com/?utm_source=subnet) – see what's hot
+- Make your calls – Yes or No, that's it
+- Watch your positions – manage your trades, see how you're doing
+
+Meanwhile, in the background, we're tracking:
+- **Your trading volume** → More activity = more rewards
+- **Your profits** → Making money? Get rewarded for it
+- **Your accuracy** → Right more often? That's worth something
+
+
+#### Step 4 (Optional): Create API keys
+
+Don't want to trade manually? Not a problem. The Wahooτ API provides live data on open markets as well as the ability to place trades. We'll leave this up to you to configure your own strategy or train a model based on the available data. Simply [generate an API key](https://account.wahoopredict.com/en/settings?tab=api-key-management) and keep your secret safe (this is used as your Authorization token in requests). 
+
+For more information about the available endpoints, please refer to Wahooτ's [official API documentation](https://wahoopredict.gitbook.io/wahoopredict-docs/api/api-for-developers).
+
+---

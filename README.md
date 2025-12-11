@@ -85,7 +85,7 @@ btcli wallet register --netuid 30
 
 #### Step 3: Link Everything Together
 
-Pop over to [Wahooτ](https://wahoopredict.com/en/auth/login?tab=register&utm_source=subnet) and create an account. After creating an account, be sure to [verify your email address](https://account.wahoopredict.com/en/settings) as well as [adding your registered Hotkey](https://account.wahoopredict.com/en/settings?tab=bittensor-wallet) to your account. Input your hotkey as the wallet address and obtain a verification messsage and sign the message with your wallet hotkey using the following btcli command:
+Pop over to [Wahooτ](https://wahoopredict.com/en/auth/login?tab=register) and create an account. After creating an account, be sure to [verify your email address](https://account.wahoopredict.com/en/settings) as well as [adding your registered Hotkey](https://account.wahoopredict.com/en/settings?tab=bittensor-wallet) to your account. Input your hotkey as the wallet address and obtain a verification messsage and sign the message with your wallet hotkey using the following btcli command:
 
 ```bash
 btcli wallet sign --use-hotkey \
