@@ -203,23 +203,23 @@ def main_loop_iteration(
             logger.warning(f"Database cleanup failed: {cleanup_error}")
 
     try:
-        logger.info("[1/9] Syncing metagraph...")
+        logger.info("[1/8] Syncing metagraph...")
         metagraph = sync_metagraph(metagraph, subtensor)
         logger.info(f"✓ Metagraph synced: {len(metagraph.uids)} total UIDs")
 
-        logger.info("[2/9] Getting active UIDs...")
+        logger.info("[2/8] Getting active UIDs...")
         active_uids = get_active_uids(metagraph)
         if not active_uids:
             logger.warning("No active UIDs found, skipping iteration")
             return
         logger.info(f"✓ Found {len(active_uids)} active UIDs")
 
-        logger.info("[3/9] Extracting hotkeys...")
+        logger.info("[3/8] Extracting hotkeys...")
         uid_to_hotkey = build_uid_to_hotkey(metagraph, active_uids=active_uids)
         hotkeys = [uid_to_hotkey[uid] for uid in active_uids if uid in uid_to_hotkey]
         logger.info(f"✓ Extracted {len(hotkeys)} hotkeys")
 
-        logger.info("[4/9] Fetching WAHOO validation data...")
+        logger.info("[4/8] Fetching WAHOO validation data...")
         try:
             validation_data = get_wahoo_validation_data(
                 hotkeys=hotkeys,
@@ -256,7 +256,7 @@ def main_loop_iteration(
                 )
                 return
 
-        logger.info("[5/9] Getting active event ID...")
+        logger.info("[5/8] Getting active event ID...")
         try:
             event_id = get_active_event_id(api_base_url=config.get("wahoo_api_url"))
             logger.info(f"✓ Active event ID: {event_id}")
@@ -264,7 +264,7 @@ def main_loop_iteration(
             logger.warning(f"Failed to get event ID, using default: {e}")
             event_id = "wahoo_test_event"
 
-        logger.info("[6/9] Computing weights...")
+        logger.info("[6/8] Computing weights...")
 
         if wahoo_weights is not None:
             logger.info("Using fallback weights from DB, skipping new computation")
@@ -308,7 +308,7 @@ def main_loop_iteration(
 
         logger.info(f"✓ Computed weights for {len(wahoo_weights)} miners")
 
-        logger.info("[7/9] Calculating rewards...")
+        logger.info("[7/8] Calculating rewards...")
         try:
             # Miner responses are not used in this subnet (miners don't run code)
             miner_responses = [None] * len(active_uids)
@@ -332,7 +332,7 @@ def main_loop_iteration(
             logger.error(f"Failed to calculate rewards: {e}")
             return
 
-        logger.info("[8/9] Setting weights on blockchain...")
+        logger.info("[8/8] Setting weights on blockchain...")
         try:
             transaction_hash, success = set_weights_with_retry(
                 subtensor=subtensor,

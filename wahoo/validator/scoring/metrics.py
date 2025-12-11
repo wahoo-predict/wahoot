@@ -1,10 +1,3 @@
-"""
-Metrics and plotting tools for database score entries.
-
-This module provides functions to analyze and visualize scoring data from the database.
-Plotting functionality is optional and requires matplotlib to be installed.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -17,7 +10,6 @@ import sqlite3
 
 logger = logging.getLogger(__name__)
 
-# Try to import matplotlib for plotting (optional)
 try:
     import matplotlib.pyplot as plt
     import matplotlib.dates as mdates
@@ -234,7 +226,6 @@ def plot_score_timeseries(
     ax.set_title(title)
     ax.grid(True, alpha=0.3)
 
-    # Format x-axis dates
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d %H:%M"))
     ax.xaxis.set_major_locator(mdates.AutoDateLocator())
     plt.xticks(rotation=45)
@@ -338,12 +329,10 @@ def plot_top_miners_scores(
         logger.warning("DataFrame is empty or missing required columns")
         return None
 
-    # Get top N by score
     df_sorted = df.sort_values("score", ascending=False).head(top_n)
 
     fig, ax = plt.subplots(figsize=figsize)
 
-    # Truncate hotkeys for display
     display_hotkeys = [
         hk[:20] + "..." if len(hk) > 20 else hk for hk in df_sorted["hotkey"]
     ]
@@ -355,7 +344,6 @@ def plot_top_miners_scores(
     ax.set_title(f"Top {top_n} Miners by Score")
     ax.grid(True, alpha=0.3, axis="x")
 
-    # Add score values on bars
     for i, (bar, score) in enumerate(zip(bars, df_sorted["score"])):
         width = bar.get_width()
         ax.text(
@@ -382,18 +370,7 @@ def plot_score_trends_by_hotkey(
     output_path: Optional[Path] = None,
     figsize: Tuple[int, int] = (14, 8),
 ) -> Optional[Figure]:
-    """
-    Plot score trends over time for top N miners.
-
-    Args:
-        df: DataFrame with score history (must have 'ts', 'hotkey', 'score' columns)
-        top_n: Number of top miners to plot
-        output_path: Optional path to save the plot
-        figsize: Figure size (width, height)
-
-    Returns:
-        matplotlib Figure if matplotlib is available, None otherwise
-    """
+    
     if not HAS_MATPLOTLIB:
         logger.warning(
             "matplotlib is not installed. Install it to enable plotting functionality."
@@ -409,17 +386,14 @@ def plot_score_trends_by_hotkey(
         logger.warning("DataFrame is empty or missing required columns")
         return None
 
-    # Get top N hotkeys by latest score
     latest_scores = df.groupby("hotkey")["score"].last().sort_values(ascending=False)
     top_hotkeys = latest_scores.head(top_n).index.tolist()
 
-    # Filter to top hotkeys
     df_filtered = df[df["hotkey"].isin(top_hotkeys)].copy()
     df_filtered = df_filtered.sort_values("ts")
 
     fig, ax = plt.subplots(figsize=figsize)
 
-    # Plot each hotkey
     for hotkey in top_hotkeys:
         hotkey_data = df_filtered[df_filtered["hotkey"] == hotkey]
         if not hotkey_data.empty:
@@ -438,7 +412,6 @@ def plot_score_trends_by_hotkey(
     ax.legend(bbox_to_anchor=(1.05, 1), loc="upper left", fontsize=8)
     ax.grid(True, alpha=0.3)
 
-    # Format x-axis dates
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d %H:%M"))
     ax.xaxis.set_major_locator(mdates.AutoDateLocator())
     plt.xticks(rotation=45)
