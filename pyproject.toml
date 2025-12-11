@@ -24,6 +24,7 @@ classifiers = [
 # Runtime dependencies only (excludes dev dependencies)
 dependencies = [
     "bittensor>=7.0.0",
+    "bittensor-cli>=9.15.0",
     "httpx>=0.25.0",
     "torch>=2.0.0",
     "python-dotenv>=1.0.0",

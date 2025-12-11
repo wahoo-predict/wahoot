@@ -1,6 +1,6 @@
 # Bittensor
 bittensor>=7.0.0
-
+bittensor-cli>=9.15.0
 # HTTP client for API calls
 httpx>=0.25.0
 
