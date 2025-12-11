@@ -85,7 +85,7 @@ btcli wallet register --netuid 30
 
 #### Step 3: Link Everything Together
 
-Pop over to [Wahooτ](https://wahoopredict.com/en/auth/login?tab=register) and create an account. After creating an account, be sure to [verify your email address](https://account.wahoopredict.com/en/settings) as well as [adding your registered Hotkey](https://account.wahoopredict.com/en/settings?tab=bittensor-wallet) to your account. Input your hotkey as the wallet address and obtain a verification messsage and sign the message with your wallet hotkey using the following btcli command:
+Pop over to [Wahooτ](https://wahoopredict.com/en/auth/login?tab=register&utm_source=subnet) and create an account. After creating an account, be sure to [verify your email address](https://account.wahoopredict.com/en/settings) as well as [adding your registered Hotkey](https://account.wahoopredict.com/en/settings?tab=bittensor-wallet) to your account. Input your hotkey as the wallet address and obtain a verification messsage and sign the message with your wallet hotkey using the following btcli command:
 
 ```bash
 btcli wallet sign --use-hotkey \
@@ -100,7 +100,7 @@ After receiving a Signature from `btcli`, input the signature within the appropr
 
 Alright, here's where it gets good. Once you're set up, **just trade like you always do**:
 
-- Browse events at [Wahooτ](https://wahoopredict.com/en/events) – see what's hot
+- Browse events at [Wahooτ](https://wahoopredict.com/?utm_source=subnet) – see what's hot
 - Make your calls – Yes or No, that's it
 - Watch your positions – manage your trades, see how you're doing
 
@@ -423,7 +423,7 @@ pip install -e ".[dev]"
 
 Got questions? Want to dive deeper? Here's where to go:
 
-- **Ready to trade?** Head to [wahoopredict.com](https://wahoopredict.com/en/events) and see what's happening
+- **Ready to trade?** Head to [wahoopredict.com](https://wahoopredict.com/?utm_source=subnet) and see what's happening
 - **Want to understand Wahooτ better?** The [Wahooτ docs](https://wahoopredict.gitbook.io/wahoopredict-docs/getting-started/what-is-wahoopredict) will fill you in
 - **Bittensor Networks**: Learn about mainnet, testnet, and network endpoints at [Bittensor Networks Documentation](https://docs.learnbittensor.org/concepts/bittensor-networks)
 - **Bittensor CLI**: Full reference at [BTCLI Documentation](https://docs.learnbittensor.org/btcli/btcli)
