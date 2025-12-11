@@ -1,10 +1,12 @@
-### Look, We Made Mining Actually Accessible
+## Mining on Wahooτ - Rewards On Top of Rewards
+
+### We Made Mining on Bittensor Easily Accessible
 
 Here's the thing: Most Bittensor subnets make you feel like you need a PhD in computer science just to get started. We looked at that and thought, "That's dumb." So we fixed it.
 
-**No code. No servers. No "why is my terminal showing errors?" moments.** Just trade on Wahooτ like you normally would, and watch the Tao rewards show up in your wallet. It's that simple.
+**No code. No servers. No "why is my terminal showing errors?" moments.** Just trade on Wahoo like you normally would, and watch the Tao rewards show up in your wallet. It's that simple.
 
-If you can make a prediction and click a button, you can mine. Period.
+If you can make a prediction and click a button, as well as create a Bittensor wallet, then you can mine. Period.
 
 ### Get Started in 3 Steps (Seriously, That's It)
 
@@ -20,7 +22,7 @@ Want more information or assistance on getting your wallet set up? The [Bittenso
 
 You will need some TAO funded on your wallet in order to register to any subnet in Bittensor. For information on how to load TAO onto your wallet, please refer to [the following guide](https://discord.com/channels/799672011265015819/1411009572092776600).
 
-After you fund your wallet with some TAO, you can run the following command to register your newly created wallet to Wahooτ:
+After you fund your wallet with some TAO, you can run the following command to register your newly created wallet to Wahoo:
 
 ```bash
 btcli wallet register --netuid 30
@@ -30,7 +32,9 @@ For more information about the available btcli commands and available arguments,
 
 #### Step 3: Link Everything Together
 
-Pop over to [Wahooτ](https://wahoopredict.com/en/auth/login?tab=register) and create an account. After creating an account, be sure to [verify your email address](https://account.wahoopredict.com/en/settings) as well as [adding your registered Hotkey](https://account.wahoopredict.com/en/settings?tab=bittensor-wallet) to your account. 
+Pop over to [Wahoo](https://wahoopredict.com/en/auth/login?tab=register) and create an account. After creating an account, be sure to [verify your email address](https://account.wahoopredict.com/en/settings) as well as [adding your registered Hotkey](https://account.wahoopredict.com/en/settings?tab=bittensor-wallet) to your account. 
+
+![wallet-linking-image](/images/wallet-linking.jpg)
 
 You will have to verify that you own the hotkey address you provided by signing a message with your hotkey. Input your hotkey as the wallet address and obtain a verification messsage and sign the message with your wallet hotkey using the following btcli command:
 
@@ -57,10 +61,18 @@ Meanwhile, in the background, we're tracking:
 - **Your accuracy** → Right more often? That's worth something
 
 
+You will need appropriate capital to trade via Wahooτ. Wahooτ accepts both fiat currency as well as various cryptocurrencies. Please head on over to the [cashier](https://account.wahoopredict.com/en/cashier?tab=deposit) to fund your account. 
+
+Ready to withdraw your winnings? Not a problem! All you need is an appropriate receiving address for one of the many cryptocurrencies listed by Wahooτ. 
+
+**Note - if depositing cryptocurrencies, ensure that you are transferring balance via the appropriate network. If you attempt to transfer on a network which your original balance is not a part of, this will result in an unrecoverable loss of funds.** 
+
 #### Step 4 (Optional): Create API keys
 
 Don't want to trade manually? Not a problem. The Wahooτ API provides live data on open markets as well as the ability to place trades. We'll leave this up to you to configure your own strategy or train a model based on the available data. Simply [generate an API key](https://account.wahoopredict.com/en/settings?tab=api-key-management) and keep your secret safe (this is used as your Authorization token in requests). 
 
 For more information about the available endpoints, please refer to Wahooτ's [official API documentation](https://wahoopredict.gitbook.io/wahoopredict-docs/api/api-for-developers).
 
----
+#### Step 5 - Even More Rewards!
+
+Do you want even more rewards for participating on Wahooτ? Look no further than the [Referral Program](https://account.wahoopredict.com/en/referrals)! By spreading the word of Wahooτ, you get rewarded with every prediction made by users that you referred!

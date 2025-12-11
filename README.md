@@ -19,7 +19,7 @@
 
 ## 🎯 What Makes This Special?
 
-Picture this: You're already trading on prediction markets, making calls on whether your favorite team will win or if that political candidate will pull through. Now imagine getting **paid in TAO** just for doing what you're already doing. That's **Wahooτ** – we took the prediction markets you love and added a Bittensor rewards layer on top.
+Picture this: You're already trading on prediction markets, making calls on whether your favorite team will win or if that political candidate will pull through. Now imagine getting **paid in TAO/alpha** just for doing what you're already doing. That's **Wahooτ** – we took the prediction markets you love and added a Bittensor rewards layer on top.
 
 **No coding. No servers. No "wait, what's a Docker container?" moments.** Just trade, perform well, and watch the rewards come in.
 
@@ -42,18 +42,18 @@ Okay, here's the deal: You don't need to understand blockchain, APIs, or any of 
 2. **You trade** – Do your thing on Wahooτ like you always do
 3. **We track** – Our validators peek at your performance through the Wahooτ API (don't worry, it's all public data)
 4. **You get scored** – Based on how much you trade, how much you profit, and how often you're right
-5. **You earn Tao** – Rewards hit your miner wallet based on your actual trading chops
+5. **You earn TAO/alpha** – Rewards hit your miner wallet based on your actual trading chops
 
 **The formula is simple:** Better trades = More rewards. More trades = More rewards. It's all about your real performance, not some abstract code test.
 
-### Why This Is Actually Different
+### Why Wahooτ is Revolutionary for Bittensor
 
 Let's be real – most Bittensor subnets read like a computer science textbook. You need to know Python, understand neural networks, and probably have a server running 24/7. **We said "nah" to all of that.**
 
 Here's what makes us different:
 
 - ✅ **Literally zero coding** – If you can click "Yes" or "No" on a prediction, you're qualified
-- ✅ **Real money, real performance** – We reward actual trading skills, not your ability to write a script
+- ✅ **Real money, real performance** – We reward actual trading skills, not your ability to write a script. Got previously experience with automated trading? Then that's only an advantage over your competetition.
 - ✅ **Built on something that works** – Wahooτ is already live and thriving. We just added the rewards layer
 - ✅ **Nothing to hide** – Your performance is public, so you can see exactly why you're earning what you're earning
 
@@ -61,60 +61,7 @@ Here's what makes us different:
 
 ## 👥 Start Mining Today (It's Actually Fun!)
 
-### Look, We Made Mining Actually Accessible
-
-Here's the thing: Most Bittensor subnets make you feel like you need a PhD in computer science just to get started. We looked at that and thought, "That's dumb." So we fixed it.
-
-**No code. No servers. No "why is my terminal showing errors?" moments.** Just trade on Wahooτ like you normally would, and watch the Tao rewards show up in your wallet. It's that simple.
-
-If you can make a prediction and click a button, you can mine. Period.
-
-### Get Started in 3 Steps (Seriously, That's It)
-
-#### Step 1: Get Your Bittensor Wallet
-
-You'll need a Bittensor wallet with a hotkey. Never heard of that? Totally fine. The [official Bittensor docs](https://docs.learnbittensor.org/miners) have your back. It's basically like setting up any crypto wallet – follow the steps, and you're golden.
-
-#### Step 2: Register on Our Subnet
-
-Copy this. Paste it. Run it. Done:
-
-```bash
-btcli wallet register --netuid 30
-```
-
-#### Step 3: Link Everything Together
-
-Pop over to [Wahooτ](https://wahoopredict.com/en/auth/login?tab=register) and create an account. After creating an account, be sure to [verify your email address](https://account.wahoopredict.com/en/settings) as well as [adding your registered Hotkey](https://account.wahoopredict.com/en/settings?tab=bittensor-wallet) to your account. Input your hotkey as the wallet address and obtain a verification messsage and sign the message with your wallet hotkey using the following btcli command:
-
-```bash
-btcli wallet sign --use-hotkey \
---wallet.name REGISTERED_WALLET \
---wallet.hotkey REGISTERED_HOTKEY \
---message "PASTE ENTIRE VERFICATION MESSAGE"
-```
-
-After receiving a Signature from `btcli`, input the signature within the appropriate field. Note that the verification message will expire after 5 minutes. Once your hotkey is linked to your account and said hotkey is registered as a miner, you can start trading to earn Tao!
-
-### Now the Fun Part: Trade and Earn
-
-Alright, here's where it gets good. Once you're set up, **just trade like you always do**:
-
-- Browse events at [Wahooτ](https://wahoopredict.com/?utm_source=subnet) – see what's hot
-- Make your calls – Yes or No, that's it
-- Watch your positions – manage your trades, see how you're doing
-
-Meanwhile, in the background, we're tracking:
-- **Your trading volume** → More activity = more rewards
-- **Your profits** → Making money? Get rewarded for it
-- **Your accuracy** → Right more often? That's worth something
-
-
-#### Step 4 (Optional): Create API keys
-
-Don't want to trade manually? Not a problem. The Wahooτ API provides live data on open markets as well as the ability to place trades. We'll leave this up to you to configure your own strategy or train a model based on the available data. Simply [generate an API key](https://account.wahoopredict.com/en/settings?tab=api-key-management) and keep your secret safe (this is used as your Authorization token in requests). 
-
-For more information about the available endpoints, please refer to Wahooτ's [official API documentation](https://wahoopredict.gitbook.io/wahoopredict-docs/api/api-for-developers).
+Check out our detailed [mining guide](miners.md) to start earning alpha based on your predictions!
 
 ---
 
