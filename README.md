@@ -67,195 +67,7 @@ Check out our detailed [mining guide](miners.md) to start earning alpha based on
 
 ## 🛡️ Running a Validator? You're Our Hero
 
-Validators are the unsung heroes here. You're the ones making sure the best traders actually get rewarded for their skills. You pull real trading data from Wahooτ, evaluate everyone's performance, and make sure TAO rewards go to the right people. It's important work, and we appreciate you.
-
-### Getting Started (The Quick Version)
-
-Same drill as miners, but you're a validator:
-
-```bash
-btcli wallet register --netuid 30
-```
-
-Make sure you've got the standard Bittensor validator requirements covered (stake weight, validator permit, all that jazz) and you're ready to roll.
-
-### Validator Flow
-
-The validator runs a continuous loop that:
-
-1. **Syncs metagraph** – Gets current network state (active UIDs, hotkeys, axons)
-2. **Fetches Wahooτ data** – Pulls trading stats from Wahooτ API for all registered traders
-3. **Queries traders** – Requests predictions from active traders on the subnet
-4. **Calculates rewards** – Scores traders using EMA-based scoring (volume, profit, win rate)
-5. **Sets weights** – Posts weights to blockchain to distribute TAO rewards
-
-The loop interval is automatically calculated from the metagraph tempo, ensuring perfect synchronization with the network.
-
-### How We Score Everyone (Keeping It Fair)
-
-We keep the scoring simple and transparent. Every miner gets evaluated on three things:
-
-- **Total Volume (USD)** – Are they actually trading, or just sitting there?
-- **Realized Profit (USD)** – Are they making money or losing it?
-- **Win Rate** – Are their predictions actually good, or are they just guessing?
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `WALLET_NAME` | Bittensor wallet name (coldkey) | **Required** |
-| `HOTKEY_NAME` | Bittensor hotkey name | **Required** |
-| `NETUID` | Subnet UID | **Required** |
-| `NETWORK` | Bittensor network (`finney` or `test`) | `finney` |
-| `USE_VALIDATOR_DB` | Enable database caching and EMA score persistence | `false` |
-| `VALIDATOR_DB_PATH` | Database file path (each validator gets their own) | `~/.wahoo/validator.db` |
-| `CHAIN_ENDPOINT` | Custom chain endpoint URL | None (advanced use only) |
-| `LOG_LEVEL` | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) | `INFO` |
-
-**Important Notes:**
-- **API endpoints are hardcoded** in the validator code (not configurable)
-  - Wahooτ API: `https://api.wahoopredict.com`
-  - Validation endpoint: `https://api.wahoopredict.com/api/v2/event/bittensor/statistics`
-- **Loop interval is automatically calculated** from metagraph tempo (synced with network)
-  - Calculated as: `tempo * block_time * 1.1` (with 10% buffer)
-  - Recalculates each iteration in case tempo changes
-  - Falls back to 100 seconds if tempo unavailable
-- **Database auto-initializes** at validator start (schema created automatically)
-  - Each validator gets their own database file
-  - Set `VALIDATOR_DB_PATH` environment variable to use a custom location
-  - Database uses SQLite with NORMAL synchronous mode (local file)
-
-### Installation & Setup
-
-**Simple 3-step setup:**
-1. Clone repo and install with UV
-2. Set your wallet keys
-3. Start validator
-
-That's it!
-
-#### Prerequisites
-
-- **Python 3.10+** (3.11 or 3.12 recommended)
-- **Unix/Linux system** (macOS or Linux)
-- **SQLite 3** (usually pre-installed)
-- **Virtual environment** (recommended: `uv` , `venv`, or `virtualenv`)
-
-#### Installation Options
-
-**Option 1: Using `uv` (Recommended - Fastest)**
-
-```bash
-# Install uv if you haven't already
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Clone the repository
-git clone <repository-url>
-cd wahoonet
-
-# Create virtual environment and install
-uv venv
-source .venv/bin/activate  # On macOS/Linux
-uv pip install -e .  # Install production dependencies
-```
-
-**Option 2: Using `pip` (Traditional)**
-
-```bash
-# Clone the repository
-git clone <repository-url>
-cd wahoonet
-
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate  # On macOS/Linux
-
-# Install the package
-pip install -e .  # Install production dependencies
-```
-
-#### Step 2: Set Up Your Wallet Keys
-
-**You need a Bittensor wallet with coldkey and hotkey:**
-
-1. **Create wallet (if needed):**
-   ```bash
-   btcli wallet new_coldkey --wallet.name <your_wallet_name>
-   btcli wallet new_hotkey --wallet.name <your_wallet_name> --wallet.hotkey <your_hotkey_name>
-   ```
-
-2. **Register on the subnet:**
-   ```bash
-   btcli wallet register --netuid <your_subnet_uid> --wallet.name <your_wallet_name> --wallet.hotkey <your_hotkey_name>
-   ```
-
-3. **Set environment variables:**
-   ```bash
-   export WALLET_NAME=<your_wallet_name>
-   export HOTKEY_NAME=<your_hotkey_name>
-   export NETUID=<your_subnet_uid>
-   export NETWORK=finney  # or "test" for testnet
-   ```
-
-**Keys are stored in `~/.bittensor/wallets/`** - the validator loads them automatically.
-
-#### Step 3: Initialize (Optional)
-
-The validator will auto-initialize on first run, but you can manually initialize:
-
-```bash
-python -m wahoo.validator.init
-```
-
-This sets up the database schema. The validator will auto-initialize if needed.
-
-#### Step 4: Start the Validator
-
-**That's it! Just run:**
-
-```bash
-# Make sure virtual environment is activated
-source .venv/bin/activate  # or: source venv/bin/activate
-
-# Start the validator as a background processs
-nohup python -m wahoo.entrypoints.validator > wahoo-validator.log 2>&1 &
-```
-
-**Or with explicit arguments:**
-```bash
-nohup python -m wahoo.entrypoints.validator \
-  --wallet.name your_wallet_name \
-  --wallet.hotkey your_hotkey_name \
-  --netuid your_subnet_uid \
-  --network finney \
-  > wahoo-validator.log 2>&1 &
-```
-
-If you want to use pm2 instead of nohup, then please use the following format:
-
-```bash
-pm2 start python --name wahoo-validator -- -m wahoo.entrypoints.validator
-```
-
-**What happens when you start:**
-
-1. ✅ **Auto-initializes database** - Creates schema if database doesn't exist (each validator gets their own database file)
-2. ✅ **Loads your wallet** from `~/.bittensor/wallets/` using the provided wallet/hotkey names
-3. ✅ **Connects to Bittensor network** (mainnet `finney` or `test` testnet)
-4. ✅ **Syncs metagraph** to get current network state (UIDs, hotkeys, axons)
-5. ✅ **Calculates loop interval** from metagraph tempo (automatically synced with network)
-6. ✅ **Initializes ValidatorDB** (if `USE_VALIDATOR_DB=true`) for caching and EMA score persistence
-7. ✅ **Enters main loop** - continuously:
-   - Syncs metagraph each iteration
-   - Fetches trading data from Wahooτ API for all registered traders
-   - Caches validation data in database (if enabled)
-   - Queries traders for predictions
-   - Calculates rewards using EMA-based scoring
-   - Persists EMA scores to database (if enabled)
-   - Sets weights on blockchain
-
-**Network Selection:** Use `--network finney` for mainnet (production) or `--network test` for testnet (testing).
-
-**Prerequisites:** Bittensor wallet created and registered on subnet, with `WALLET_NAME`, `HOTKEY_NAME`, and `NETUID` configured.
-
+Check out our detailed [validator guide](validators.md) if you're a validator!
 
 ---
 
@@ -265,7 +77,6 @@ pm2 start python --name wahoo-validator -- -m wahoo.entrypoints.validator
 
 - Make sure you're in a virtual environment
 - Try running with elevated privileges: `sudo wahoo-validator-init`
-- Or manually install: `pip install -r requirements.txt` or `uv pip install -e .`
 
 **Issue: Database errors**
 
@@ -275,9 +86,9 @@ pm2 start python --name wahoo-validator -- -m wahoo.entrypoints.validator
 
 **Issue: Import errors**
 
-- Ensure the package is installed in editable mode: `pip install -e .` or `uv pip install -e .`
+- Ensure the package is installed in editable mode: `uv pip install -e .`
 - Verify your virtual environment is activated
-- Check that all dependencies are installed: `pip list` or `uv pip list`
+- Check that all dependencies are installed: `uv pip list`
 
 **Issue: Alembic migration errors**
 
@@ -344,7 +155,7 @@ wahoo-db-query stats
 wahoo-db-query latest-scores
 
 # Check a specific miner's trading performance
-wahoo-db-query miner 5EZ3Q91mFT8eRT6innXB8JVV8PLjvW8uDF85P6sF34WdxQwF
+wahoo-db-query miner miner_hotkey_here
 
 # View recent scoring activity
 wahoo-db-query scores --limit 100
@@ -359,9 +170,6 @@ For development work, install with dev dependencies:
 ```bash
 # With uv
 uv pip install -e ".[dev]"
-
-# With pip
-pip install -e ".[dev]"
 ```
 
 ---
