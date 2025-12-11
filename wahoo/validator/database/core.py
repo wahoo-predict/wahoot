@@ -257,3 +257,61 @@ class ValidatorDB(ValidatorDBInterface):
         except Exception as e:
             logger.error(f"Failed to retrieve latest scores: {e}")
             return {}
+
+    def remove_unregistered_miners(self, registered_hotkeys: Sequence[str]) -> int:
+        if not registered_hotkeys:
+            logger.warning("No registered hotkeys provided, skipping removal")
+            return 0
+
+        try:
+            conn = self._get_conn()
+            cursor = conn.cursor()
+
+            # Get all hotkeys currently in the database
+            cursor.execute("SELECT hotkey FROM miners")
+            db_hotkeys = {row[0] for row in cursor.fetchall()}
+
+            # Find hotkeys that are in DB but not in registered list
+            registered_set = set(registered_hotkeys)
+            unregistered_hotkeys = db_hotkeys - registered_set
+
+            if not unregistered_hotkeys:
+                conn.close()
+                return 0
+
+            # Delete from related tables (order matters due to foreign key constraints)
+            # First delete from performance_snapshots (has foreign key to miners)
+            placeholders = ",".join("?" for _ in unregistered_hotkeys)
+            cursor.execute(
+                f"DELETE FROM performance_snapshots WHERE hotkey IN ({placeholders})",
+                list(unregistered_hotkeys),
+            )
+            snapshots_deleted = cursor.rowcount
+
+            # Delete from scoring_runs
+            cursor.execute(
+                f"DELETE FROM scoring_runs WHERE hotkey IN ({placeholders})",
+                list(unregistered_hotkeys),
+            )
+            scoring_runs_deleted = cursor.rowcount
+
+            # Finally delete from miners table
+            cursor.execute(
+                f"DELETE FROM miners WHERE hotkey IN ({placeholders})",
+                list(unregistered_hotkeys),
+            )
+            miners_deleted = cursor.rowcount
+
+            conn.commit()
+            conn.close()
+
+            logger.info(
+                f"Removed {miners_deleted} unregistered miners from database: "
+                f"{snapshots_deleted} performance snapshots, "
+                f"{scoring_runs_deleted} scoring runs deleted"
+            )
+
+            return miners_deleted
+        except Exception as e:
+            logger.error(f"Failed to remove unregistered miners: {e}")
+            return 0

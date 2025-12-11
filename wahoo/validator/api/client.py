@@ -370,7 +370,19 @@ class ValidatorDBInterface:
             Dictionary of hotkey -> score
         """
         raise NotImplementedError
+        
+    def remove_unregistered_miners(self, registered_hotkeys: Sequence[str]) -> int:
+        """
+        Remove all miners from the database that are not in the registered_hotkeys list.
+        This deletes entries from miners, performance_snapshots, and scoring_runs tables.
 
+        Args:
+            registered_hotkeys: List of hotkeys that are currently registered
+
+        Returns:
+            Number of miners removed
+        """
+        raise NotImplementedError
 
 def get_wahoo_validation_data(
     hotkeys: Sequence[str],

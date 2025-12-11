@@ -228,6 +228,19 @@ def main_loop_iteration(
             )
             logger.info(f"✓ Fetched validation data for {len(validation_data)} miners")
 
+            # Remove unregistered miners from database after API call
+            if validator_db is not None:
+                try:
+                    removed_count = validator_db.remove_unregistered_miners(
+                        registered_hotkeys=hotkeys
+                    )
+                    if removed_count > 0:
+                        logger.info(
+                            f"✓ Removed {removed_count} unregistered miners from database"
+                        )
+                except Exception as e:
+                    logger.warning(f"Failed to remove unregistered miners: {e}")
+
             if should_skip_weight_computation(validation_data, log_reason=True):
                 logger.warning(
                     "No usable validation data available after API + cache fallback. "
