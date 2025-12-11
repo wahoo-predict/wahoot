@@ -14,7 +14,6 @@ from .api import (
 from .blockchain import set_weights_with_retry
 from .scoring.rewards import reward
 from .utils.miners import build_uid_to_hotkey, get_active_uids
-from wahoo.protocol.protocol import WAHOOPredict
 
 load_dotenv()
 
@@ -134,80 +133,13 @@ def calculate_loop_interval(metagraph: bt.Metagraph) -> float:
     return 100.0
 
 
-def query_miners(
-    dendrite: bt.Dendrite,
-    metagraph: bt.Metagraph,
-    active_uids: List[int],
-    event_id: str,
-    timeout: float = 12.0,
-) -> List[WAHOOPredict]:
-    """
-    Query miners via dendrite.
-    Note: In this subnet, miners may not run code, so this is a placeholder.
-    Returns empty responses if miners don't have valid axons.
-    """
-    if not active_uids:
-        logger.debug("No active UIDs to query")
-        return []
-
-    logger.debug(
-        f"Querying {len(active_uids)} miners for event_id={event_id} "
-        f"with timeout={timeout}s"
-    )
-
-    # Filter to only UIDs with valid axons (if any)
-    valid_axons = []
-    valid_uids = []
-    for uid in active_uids:
-        try:
-            if uid < len(metagraph.axons):
-                axon = metagraph.axons[uid]
-                # Check if axon has valid IP/port (optional check)
-                if hasattr(axon, "ip") and hasattr(axon, "port"):
-                    ip = str(axon.ip) if axon.ip else "0.0.0.0"
-                    port = int(axon.port) if axon.port else 0
-                    if ip != "0.0.0.0" and port > 0:
-                        valid_axons.append(axon)
-                        valid_uids.append(uid)
-        except (IndexError, AttributeError, TypeError) as e:
-            logger.debug(f"UID {uid} has no valid axon: {e}")
-            continue
-
-    if not valid_axons:
-        logger.debug(
-            "No miners with valid axons to query (this is expected if miners don't run code)"
-        )
-        return [None] * len(active_uids)
-
-    synapses = [WAHOOPredict(event_id=event_id) for _ in valid_axons]
-
-    try:
-        responses = dendrite.query(
-            axons=valid_axons,
-            synapses=synapses,
-            timeout=timeout,
-        )
-        logger.debug(
-            f"Received {len(responses)} responses from {len(valid_axons)} miners with axons"
-        )
-        full_responses = [None] * len(active_uids)
-        for i, uid in enumerate(valid_uids):
-            if uid in active_uids:
-                idx = active_uids.index(uid)
-                full_responses[idx] = responses[i] if i < len(responses) else None
-        return full_responses
-    except Exception as e:
-        logger.debug(f"Error querying miners (expected if miners don't run code): {e}")
-        return [None] * len(active_uids)
-
-
 def compute_weights(
     validation_data: List[Any],
     active_uids: List[int],
     uid_to_hotkey: Dict[int, str],
     previous_scores: Optional[Dict[str, float]] = None,
 ) -> tuple[Dict[str, float], Dict[str, float]]:
-    from .dataframe import records_to_dataframe
+    from .scoring.dataframe import records_to_dataframe
     from .scoring.operators import EMAVolumeScorer
 
     logger.debug("Computing weights using EMAVolumeScorer...")
@@ -271,23 +203,23 @@ def main_loop_iteration(
             logger.warning(f"Database cleanup failed: {cleanup_error}")
 
     try:
-        logger.info("[1/9] Syncing metagraph...")
+        logger.info("[1/8] Syncing metagraph...")
         metagraph = sync_metagraph(metagraph, subtensor)
         logger.info(f"✓ Metagraph synced: {len(metagraph.uids)} total UIDs")
 
-        logger.info("[2/9] Getting active UIDs...")
+        logger.info("[2/8] Getting active UIDs...")
         active_uids = get_active_uids(metagraph)
         if not active_uids:
             logger.warning("No active UIDs found, skipping iteration")
             return
         logger.info(f"✓ Found {len(active_uids)} active UIDs")
 
-        logger.info("[3/9] Extracting hotkeys...")
+        logger.info("[3/8] Extracting hotkeys...")
         uid_to_hotkey = build_uid_to_hotkey(metagraph, active_uids=active_uids)
         hotkeys = [uid_to_hotkey[uid] for uid in active_uids if uid in uid_to_hotkey]
         logger.info(f"✓ Extracted {len(hotkeys)} hotkeys")
 
-        logger.info("[4/9] Fetching WAHOO validation data...")
+        logger.info("[4/8] Fetching WAHOO validation data...")
         try:
             validation_data = get_wahoo_validation_data(
                 hotkeys=hotkeys,
@@ -324,7 +256,7 @@ def main_loop_iteration(
                 )
                 return
 
-        logger.info("[5/9] Getting active event ID...")
+        logger.info("[5/8] Getting active event ID...")
         try:
             event_id = get_active_event_id(api_base_url=config.get("wahoo_api_url"))
             logger.info(f"✓ Active event ID: {event_id}")
@@ -332,17 +264,7 @@ def main_loop_iteration(
             logger.warning(f"Failed to get event ID, using default: {e}")
             event_id = "wahoo_test_event"
 
-        logger.info("[6/9] Querying miners...")
-        miner_responses = query_miners(
-            dendrite=dendrite,
-            metagraph=metagraph,
-            active_uids=active_uids,
-            event_id=event_id,
-            timeout=12.0,
-        )
-        logger.info(f"✓ Queried {len(miner_responses)} miners (placeholder)")
-
-        logger.info("[7/9] Computing weights...")
+        logger.info("[6/8] Computing weights...")
 
         if wahoo_weights is not None:
             logger.info("Using fallback weights from DB, skipping new computation")
@@ -386,8 +308,10 @@ def main_loop_iteration(
 
         logger.info(f"✓ Computed weights for {len(wahoo_weights)} miners")
 
-        logger.info("[8/9] Calculating rewards...")
+        logger.info("[7/8] Calculating rewards...")
         try:
+            # Miner responses are not used in this subnet (miners don't run code)
+            miner_responses = [None] * len(active_uids)
             rewards = reward(
                 responses=miner_responses,
                 uids=active_uids,
@@ -408,7 +332,7 @@ def main_loop_iteration(
             logger.error(f"Failed to calculate rewards: {e}")
             return
 
-        logger.info("[9/9] Setting weights on blockchain...")
+        logger.info("[8/8] Setting weights on blockchain...")
         try:
             transaction_hash, success = set_weights_with_retry(
                 subtensor=subtensor,

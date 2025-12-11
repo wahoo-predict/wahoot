@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional, Sequence
 import numpy as np
 import pandas as pd
 
-from ..dataframe import ensure_required_columns
+from .dataframe import ensure_required_columns
 
 HALF_LIFE_SECONDS = 12 * 3600
 EPOCH_INTERVAL_SECONDS = 360 * 12
