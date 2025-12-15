@@ -390,7 +390,7 @@ def get_wahoo_validation_data(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     *,
-    max_per_batch: int = 256,
+    max_per_batch: int = 64,
     batch_timeout: float = 30.0,
     api_base_url: Optional[str] = None,
     validator_db: Optional[ValidatorDBInterface] = None,
