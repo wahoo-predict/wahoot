@@ -35,7 +35,7 @@ def calculate_epoch_timestamps(
 ) -> Tuple[Optional[str], Optional[str]]:
     """
     Calculate start_date and end_date timestamps for the current Bittensor epoch.
-        
+
     Returns:
         Tuple of (start_date, end_date) as ISO8601 strings, or (None, None) if unable to calculate
     """
@@ -46,51 +46,62 @@ def calculate_epoch_timestamps(
             current_block = subtensor.block
         elif hasattr(subtensor, "get_current_block"):
             current_block = subtensor.get_current_block()
-        
+
         if current_block is None:
-            logger.warning("Could not get current block number, skipping epoch timestamp calculation")
+            logger.warning(
+                "Could not get current block number, skipping epoch timestamp calculation"
+            )
             return None, None
-        
+
         # Get blocks per epoch
         blocks_per_epoch = None
-        if hasattr(metagraph, "blocks_per_epoch") and metagraph.blocks_per_epoch is not None:
+        if (
+            hasattr(metagraph, "blocks_per_epoch")
+            and metagraph.blocks_per_epoch is not None
+        ):
             blocks_per_epoch = int(metagraph.blocks_per_epoch)
         elif hasattr(metagraph, "tempo") and metagraph.tempo is not None:
             blocks_per_epoch = int(metagraph.tempo)
-        
+
         if blocks_per_epoch is None or blocks_per_epoch <= 0:
-            logger.warning("Could not get blocks_per_epoch from metagraph, skipping epoch timestamp calculation")
+            logger.warning(
+                "Could not get blocks_per_epoch from metagraph, skipping epoch timestamp calculation"
+            )
             return None, None
-        
+
         # Calculate current epoch number
         current_epoch = current_block // blocks_per_epoch
-        
+
         # Calculate epoch start and end blocks
         epoch_start_block = current_epoch * blocks_per_epoch
         epoch_end_block = (current_epoch + 1) * blocks_per_epoch - 1
-        
+
         # Get current time as reference
         current_time = datetime.now(timezone.utc)
-        
+
         # Calculate timestamps based on block differences
         # Estimate: blocks ago * block_time = seconds ago
         blocks_from_start = current_block - epoch_start_block
         blocks_to_end = epoch_end_block - current_block
-        
-        epoch_start_time = current_time - timedelta(seconds=blocks_from_start * BLOCK_TIME_SECONDS)
-        epoch_end_time = current_time + timedelta(seconds=blocks_to_end * BLOCK_TIME_SECONDS)
-        
+
+        epoch_start_time = current_time - timedelta(
+            seconds=blocks_from_start * BLOCK_TIME_SECONDS
+        )
+        epoch_end_time = current_time + timedelta(
+            seconds=blocks_to_end * BLOCK_TIME_SECONDS
+        )
+
         # Format as ISO8601 strings (API expects this format)
         start_date = epoch_start_time.isoformat().replace("+00:00", "Z")
         end_date = epoch_end_time.isoformat().replace("+00:00", "Z")
-        
+
         logger.debug(
             f"Epoch {current_epoch}: blocks {epoch_start_block}-{epoch_end_block}, "
             f"timestamps {start_date} to {end_date}"
         )
-        
+
         return start_date, end_date
-        
+
     except Exception as e:
         logger.warning(f"Failed to calculate epoch timestamps: {e}")
         return None, None
@@ -291,18 +302,16 @@ def main_loop_iteration(
         try:
             # Calculate epoch timestamps for the current Bittensor epoch
             start_date, end_date = calculate_epoch_timestamps(subtensor, metagraph)
-            
+
             if not start_date or not end_date:
                 logger.warning(
                     "Could not calculate epoch timestamps. Skipping weight setting for this epoch "
                     "to avoid using full history. Will retry next iteration."
                 )
                 return
-            
-            logger.info(
-                f"Using epoch date range: {start_date} to {end_date}"
-            )
-            
+
+            logger.info(f"Using epoch date range: {start_date} to {end_date}")
+
             validation_data = get_wahoo_validation_data(
                 hotkeys=hotkeys,
                 start_date=start_date,
