@@ -1,0 +1,317 @@
+import logging
+import os
+import sqlite3
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Sequence
+
+from ..api.client import ValidatorDBInterface
+from .validator_db import get_or_create_database
+
+logger = logging.getLogger(__name__)
+
+DEFAULT_SNAPSHOT_RETENTION_DAYS = int(
+    os.getenv("VALIDATOR_SNAPSHOT_RETENTION_DAYS", "3")
+)
+DEFAULT_SCORING_RETENTION_DAYS = int(os.getenv("VALIDATOR_SCORING_RETENTION_DAYS", "7"))
+
+
+class ValidatorDB(ValidatorDBInterface):
+    def __init__(self, db_path: Optional[Path] = None):
+        self.db_path = db_path
+        get_or_create_database(self.db_path)
+
+    def _get_conn(self) -> sqlite3.Connection:
+        return get_or_create_database(self.db_path)
+
+    def cache_validation_data(self, hotkey: str, data_dict: Dict[str, Any]) -> None:
+        try:
+            conn = self._get_conn()
+            cursor = conn.cursor()
+
+            perf = data_dict.get("performance", {})
+
+            timestamp = datetime.utcnow().isoformat() + "Z"
+
+            cursor.execute(
+                """
+                INSERT INTO performance_snapshots (
+                    hotkey, timestamp,
+                    total_volume_usd, trade_count, realized_profit_usd,
+                    unrealized_profit_usd, win_rate, total_fees_paid_usd,
+                    open_positions_count, referral_count, referral_volume
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    hotkey,
+                    timestamp,
+                    perf.get("total_volume_usd"),
+                    perf.get("trade_count"),
+                    perf.get("realized_profit_usd"),
+                    perf.get("unrealized_profit_usd"),
+                    perf.get("win_rate"),
+                    perf.get("total_fees_paid_usd"),
+                    perf.get("open_positions_count"),
+                    perf.get("referral_count"),
+                    perf.get("referral_volume_usd"),
+                ),
+            )
+
+            cursor.execute(
+                """
+                INSERT INTO miners (hotkey, last_seen_ts)
+                VALUES (?, ?)
+                ON CONFLICT(hotkey) DO UPDATE SET last_seen_ts = excluded.last_seen_ts
+                """,
+                (hotkey, timestamp),
+            )
+
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            logger.error(f"Failed to cache validation data for {hotkey}: {e}")
+
+    def get_cached_validation_data(
+        self, hotkeys: Sequence[str], max_age_days: int = 7
+    ) -> List[Dict[str, Any]]:
+        if not hotkeys:
+            return []
+
+        try:
+            conn = self._get_conn()
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+
+            cutoff_date = (datetime.utcnow() - timedelta(days=max_age_days)).isoformat()
+
+            placeholders = ",".join("?" for _ in hotkeys)
+            query = f"""
+                SELECT * FROM performance_snapshots
+                WHERE hotkey IN ({placeholders})
+                AND timestamp > ?
+                ORDER BY timestamp DESC
+            """
+
+            query = f"""
+                SELECT * FROM (
+                    SELECT *,
+                           ROW_NUMBER() OVER (PARTITION BY hotkey ORDER BY timestamp DESC) as rn
+                    FROM performance_snapshots
+                    WHERE hotkey IN ({placeholders})
+                    AND timestamp > ?
+                ) WHERE rn = 1
+            """
+
+            params = list(hotkeys) + [cutoff_date]
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+            conn.close()
+
+            results = []
+            for row in rows:
+                data = dict(row)
+                perf = {
+                    "total_volume_usd": data["total_volume_usd"],
+                    "trade_count": data["trade_count"],
+                    "realized_profit_usd": data["realized_profit_usd"],
+                    "unrealized_profit_usd": data["unrealized_profit_usd"],
+                    "win_rate": data["win_rate"],
+                    "total_fees_paid_usd": data["total_fees_paid_usd"],
+                    "open_positions_count": data["open_positions_count"],
+                    "referral_count": data["referral_count"],
+                    "referral_volume_usd": data["referral_volume"],
+                }
+
+                record = {
+                    "hotkey": data["hotkey"],
+                    "performance": perf,
+                }
+                results.append(record)
+
+            return results
+
+        except Exception as e:
+            logger.error(f"Failed to retrieve cached data: {e}")
+            return []
+
+    def delete_cached_validation_data(self, hotkeys: Sequence[str]) -> None:
+        if not hotkeys:
+            return
+
+        try:
+            conn = self._get_conn()
+            cursor = conn.cursor()
+            placeholders = ",".join("?" for _ in hotkeys)
+            cursor.execute(
+                f"DELETE FROM performance_snapshots WHERE hotkey IN ({placeholders})",
+                list(hotkeys),
+            )
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            logger.error(f"Failed to delete cached data: {e}")
+
+    def cleanup_old_cache(
+        self,
+        snapshot_retention_days: Optional[int] = None,
+        scoring_retention_days: Optional[int] = None,
+    ) -> Dict[str, int]:
+        """
+        Clean up old database entries automatically.
+
+        Args:
+            snapshot_retention_days: Days to keep performance_snapshots (default: 3)
+            scoring_retention_days: Days to keep scoring_runs (default: 7)
+
+        Returns:
+            Dict with 'snapshots_deleted' and 'scoring_runs_deleted' counts
+        """
+        if snapshot_retention_days is None:
+            snapshot_retention_days = DEFAULT_SNAPSHOT_RETENTION_DAYS
+        if scoring_retention_days is None:
+            scoring_retention_days = DEFAULT_SCORING_RETENTION_DAYS
+
+        result = {"snapshots_deleted": 0, "scoring_runs_deleted": 0}
+
+        try:
+            conn = self._get_conn()
+            cursor = conn.cursor()
+
+            snapshot_cutoff = (
+                datetime.utcnow() - timedelta(days=snapshot_retention_days)
+            ).isoformat()
+            cursor.execute(
+                "DELETE FROM performance_snapshots WHERE timestamp < ?",
+                (snapshot_cutoff,),
+            )
+            result["snapshots_deleted"] = cursor.rowcount
+
+            scoring_cutoff = (
+                datetime.utcnow() - timedelta(days=scoring_retention_days)
+            ).isoformat()
+            cursor.execute(
+                "DELETE FROM scoring_runs WHERE ts < ?",
+                (scoring_cutoff,),
+            )
+            result["scoring_runs_deleted"] = cursor.rowcount
+
+            conn.commit()
+
+            if result["snapshots_deleted"] > 0 or result["scoring_runs_deleted"] > 0:
+                conn.execute("VACUUM")
+                conn.commit()
+
+            conn.close()
+
+            return result
+        except Exception as e:
+            logger.error(f"Failed to cleanup database: {e}")
+            return result
+
+    def add_scoring_run(
+        self, scores: Dict[str, float], reason: str = "ema_update"
+    ) -> None:
+        if not scores:
+            return
+
+        try:
+            conn = self._get_conn()
+            cursor = conn.cursor()
+
+            timestamp = datetime.utcnow().isoformat() + "Z"
+
+            data = [
+                (timestamp, hotkey, score, reason) for hotkey, score in scores.items()
+            ]
+
+            cursor.executemany(
+                "INSERT INTO scoring_runs (ts, hotkey, score, reason) VALUES (?, ?, ?, ?)",
+                data,
+            )
+
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            logger.error(f"Failed to save scoring run: {e}")
+
+    def get_latest_scores(self) -> Dict[str, float]:
+        try:
+            conn = self._get_conn()
+            cursor = conn.cursor()
+
+            query = """
+                SELECT hotkey, score
+                FROM (
+                    SELECT hotkey, score,
+                           ROW_NUMBER() OVER (PARTITION BY hotkey ORDER BY ts DESC) as rn
+                    FROM scoring_runs
+                )
+                WHERE rn = 1
+            """
+
+            cursor.execute(query)
+            rows = cursor.fetchall()
+            conn.close()
+
+            return {row[0]: row[1] for row in rows}
+        except Exception as e:
+            logger.error(f"Failed to retrieve latest scores: {e}")
+            return {}
+
+    def remove_unregistered_miners(self, registered_hotkeys: Sequence[str]) -> int:
+        if not registered_hotkeys:
+            logger.warning("No registered hotkeys provided, skipping removal")
+            return 0
+
+        try:
+            conn = self._get_conn()
+            cursor = conn.cursor()
+
+            # Get all hotkeys currently in the database
+            cursor.execute("SELECT hotkey FROM miners")
+            db_hotkeys = {row[0] for row in cursor.fetchall()}
+
+            # Find hotkeys that are in DB but not in registered list
+            registered_set = set(registered_hotkeys)
+            unregistered_hotkeys = db_hotkeys - registered_set
+
+            if not unregistered_hotkeys:
+                conn.close()
+                return 0
+
+            # Delete from related tables (order matters due to foreign key constraints)
+            # First delete from performance_snapshots (has foreign key to miners)
+            placeholders = ",".join("?" for _ in unregistered_hotkeys)
+            cursor.execute(
+                f"DELETE FROM performance_snapshots WHERE hotkey IN ({placeholders})",
+                list(unregistered_hotkeys),
+            )
+            snapshots_deleted = cursor.rowcount
+
+            # Delete from scoring_runs
+            cursor.execute(
+                f"DELETE FROM scoring_runs WHERE hotkey IN ({placeholders})",
+                list(unregistered_hotkeys),
+            )
+            scoring_runs_deleted = cursor.rowcount
+
+            # Finally delete from miners table
+            cursor.execute(
+                f"DELETE FROM miners WHERE hotkey IN ({placeholders})",
+                list(unregistered_hotkeys),
+            )
+            miners_deleted = cursor.rowcount
+
+            conn.commit()
+            conn.close()
+
+            logger.info(
+                f"Removed {miners_deleted} unregistered miners from database: "
+                f"{snapshots_deleted} performance snapshots, "
+                f"{scoring_runs_deleted} scoring runs deleted"
+            )
+
+            return miners_deleted
+        except Exception as e:
+            logger.error(f"Failed to remove unregistered miners: {e}")
+            return 0
