@@ -104,12 +104,24 @@ class ValidationAPIClient:
         response = self._request_with_retries(params)
         payload = self._extract_payload(response)
         records: List[ValidationRecord] = []
+        returned_hotkeys: Set[str] = set()
+
+        # Process records returned by the API
         for item in payload:
             try:
                 record = ValidationRecord.model_validate(item)
+                records.append(record)
+                returned_hotkeys.add(record.hotkey)
             except ValidationError as exc:
                 raise ValidationAPIError(f"Invalid validation record: {exc}") from exc
+
+        # Create records for hotkeys that weren't returned by the API
+        # This ensures all registered hotkeys have records, even if they have no data
+        missing_hotkeys = set(valid_hotkeys) - returned_hotkeys
+        for hotkey in missing_hotkeys:
+            record = ValidationRecord(hotkey=hotkey)
             records.append(record)
+
         return records
 
     def _normalize_hotkeys(self, hotkeys: Sequence[str]) -> List[str]:
