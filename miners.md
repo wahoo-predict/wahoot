@@ -41,10 +41,7 @@ Pop over to [Wahoo](https://wahoopredict.com/en/auth/login?tab=register) and cre
 You will have to verify that you own the hotkey address you provided by signing a message with your hotkey. Input your hotkey as the wallet address and obtain a verification messsage and sign the message with your wallet hotkey using the following btcli command:
 
 ```bash
-btcli wallet sign --use-hotkey \
---wallet.name REGISTERED_WALLET \
---wallet.hotkey REGISTERED_HOTKEY \
---message "PASTE ENTIRE VERFICATION MESSAGE"
+btcli wallet sign --use-hotkey --wallet.name REGISTERED_WALLET --wallet.hotkey REGISTERED_HOTKEY --message "PASTE ENTIRE VERFICATION MESSAGE"
 ```
 
 After receiving a Signature from `btcli`, input the signature within the appropriate field. Note that the verification message will expire after 5 minutes. Once your hotkey is linked to your account and said hotkey is registered as a miner, you can start trading to earn Tao!

@@ -78,7 +78,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Clone the repository
 git clone <repository-url>
-cd wahoonet
+cd wahoot
 
 # Create virtual environment and install
 uv venv
@@ -105,11 +105,11 @@ uv pip install -e .  # Install production dependencies
    ```bash
    export WALLET_NAME=<your_wallet_name>
    export HOTKEY_NAME=<your_hotkey_name>
-   export NETUID=<your_subnet_uid>
+   export NETUID=30
    export NETWORK=finney  # or "test" for testnet
    ```
 
-**Keys are stored in `~/.bittensor/wallets/`** - the validator loads them automatically.
+**Note**: You can also create a `.env` file within the root of the repository to hold the arguments read by the validator. If you set environment variables in your shell, these are only set for the current session and do not persist.
 
 #### Step 3: Initialize (Optional)
 

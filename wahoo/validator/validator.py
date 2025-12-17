@@ -188,7 +188,7 @@ def calculate_loop_interval(metagraph: bt.Metagraph) -> float:
     try:
         if hasattr(metagraph, "tempo") and metagraph.tempo is not None:
             tempo = int(metagraph.tempo)
-            interval = tempo * BLOCK_TIME_SECONDS * 1.1
+            interval = tempo * BLOCK_TIME_SECONDS 
             logger.info(
                 f"Calculated loop interval from tempo: {tempo} blocks = {interval:.1f}s"
             )
