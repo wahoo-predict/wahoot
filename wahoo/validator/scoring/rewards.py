@@ -15,6 +15,14 @@ USE_EQUAL_WEIGHTS_FALLBACK = (
 MIN_VOLUME_USD = 0.0
 MIN_WIN_RATE = 0.0
 
+# Burn mechanism: percentage of emissions that go to miners vs owner
+# Hardcoded to 0.5 = 50% to miners, 50% to owner (ensures validator consensus)
+MINER_EMISSION_PERCENTAGE = 0.5
+BURN_RATE = 1.0 - MINER_EMISSION_PERCENTAGE  # 0.5 = 50% burn rate
+
+# Owner/Validator UID that receives the burned portion (50% of emissions)
+OWNER_UID = 176
+
 
 def _is_finite_number(value: float) -> bool:
     return math.isfinite(value)
@@ -235,12 +243,21 @@ def reward(
 
     total = rewards.sum()
     if total > 0.0:
-        rewards = rewards / total
+        # Normalize to sum to 1.0 first, then scale by MINER_EMISSION_PERCENTAGE
+        # This implements the burn mechanism: only MINER_EMISSION_PERCENTAGE goes to miners
+        # The remaining BURN_RATE (50%) will be routed to owner UID 176
+        rewards = rewards / total * MINER_EMISSION_PERCENTAGE
+        logger.info(
+            f"Applied {MINER_EMISSION_PERCENTAGE*100:.1f}% miner emissions "
+            f"(burn_rate: {BURN_RATE*100:.1f}% will route to owner UID {OWNER_UID}). "
+            f"Total weight sum: {rewards.sum().item():.6f}"
+        )
     else:
         if USE_EQUAL_WEIGHTS_FALLBACK:
             valid_count = sum(1 for uid in uids if rewards_dict.get(uid, 0.0) > 0.0)
             if valid_count > 0:
-                equal_weight = 1.0 / valid_count
+                # Apply burn rate to equal weights as well
+                equal_weight = (1.0 / valid_count) * MINER_EMISSION_PERCENTAGE
                 rewards = torch.FloatTensor(
                     [
                         equal_weight if rewards_dict.get(uid, 0.0) > 0.0 else 0.0
@@ -249,7 +266,8 @@ def reward(
                 )
                 logger.info(
                     f"All WAHOO weights zero, using equal weights fallback: "
-                    f"{valid_count} miners with valid responses, weight={equal_weight:.6f}"
+                    f"{valid_count} miners with valid responses, weight={equal_weight:.6f} "
+                    f"({MINER_EMISSION_PERCENTAGE*100:.1f}% to miners, burn_rate: {BURN_RATE*100:.1f}% to owner UID {OWNER_UID})"
                 )
             else:
                 rewards = torch.zeros(len(uids), dtype=torch.float32)
@@ -263,10 +281,11 @@ def reward(
     if total > 0.0:
         sum_after_norm = rewards.sum().item()
         epsilon = 1e-6
-        if abs(sum_after_norm - 1.0) >= epsilon:
+        expected_sum = MINER_EMISSION_PERCENTAGE
+        if abs(sum_after_norm - expected_sum) >= epsilon:
             logger.warning(
                 f"Normalization invariant violation: rewards.sum() = {sum_after_norm}, "
-                f"expected 1.0 (tolerance: {epsilon})"
+                f"expected {expected_sum} (tolerance: {epsilon})"
             )
 
     if total > 0.0 and rewards.sum().item() > 0.0:

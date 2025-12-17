@@ -5,6 +5,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Any, Tuple
 
 import bittensor as bt
+import torch
 from dotenv import load_dotenv
 
 from .api import (
@@ -13,7 +14,7 @@ from .api import (
     should_skip_weight_computation,
 )
 from .blockchain import set_weights_with_retry
-from .scoring.rewards import reward
+from .scoring.rewards import reward, OWNER_UID, MINER_EMISSION_PERCENTAGE, BURN_RATE
 from .utils.miners import build_uid_to_hotkey, get_active_uids
 
 load_dotenv()
@@ -434,6 +435,31 @@ def main_loop_iteration(
             else:
                 logger.warning("All rewards are zero, skipping set_weights() call")
                 return
+
+            # Route burned portion (BURN_RATE) to owner/validator UID 176
+            # Note: UID 176 is a validator, not a miner, so it won't be in active_uids
+            # burn_rate = 50% of emissions routes to owner UID 176
+            owner_weight = BURN_RATE  # 0.5 = 50% burn rate
+            final_uids = list(active_uids)
+            final_weights = rewards.clone()
+
+            # Check if owner UID exists in metagraph
+            if OWNER_UID < len(metagraph.uids):
+                # Add owner UID to the list (it's a validator, not in active_uids)
+                final_uids.append(OWNER_UID)
+                # Add owner weight (burn_rate) to the weights tensor
+                final_weights = torch.cat([final_weights, torch.tensor([owner_weight], dtype=torch.float32)])
+                logger.info(
+                    f"✓ Routed burn_rate ({BURN_RATE*100:.1f}%) to owner/validator UID {OWNER_UID} "
+                    f"with weight {owner_weight:.6f}"
+                )
+            else:
+                logger.warning(
+                    f"Owner UID {OWNER_UID} does not exist in metagraph "
+                    f"(max UID: {len(metagraph.uids)-1}). "
+                    f"burn_rate ({BURN_RATE*100:.1f}%) will be truly burned instead."
+                )
+
         except Exception as e:
             logger.error(f"Failed to calculate rewards: {e}")
             return
@@ -444,19 +470,19 @@ def main_loop_iteration(
                 subtensor=subtensor,
                 wallet=wallet,
                 netuid=netuid,
-                uids=active_uids,
-                weights=rewards,
+                uids=final_uids,
+                weights=final_weights,
             )
             if success and transaction_hash:
                 logger.info("=" * 70)
                 logger.info("✓✓✓ WEIGHTS SET SUCCESSFULLY ON BLOCKCHAIN ✓✓✓")
                 logger.info("=" * 70)
                 logger.info(f"Transaction Hash: {transaction_hash}")
-                logger.info(f"Number of Miners: {len(active_uids)}")
+                logger.info(f"Number of UIDs: {len(final_uids)}")
                 logger.info("Weight Distribution:")
-                for uid, weight in zip(active_uids, rewards):
+                for uid, weight in zip(final_uids, final_weights):
                     logger.info(f"  UID {uid}: {weight:.6f} ({weight*100:.2f}%)")
-                logger.info(f"Total Weight Sum: {rewards.sum().item():.6f}")
+                logger.info(f"Total Weight Sum: {final_weights.sum().item():.6f}")
                 logger.info("=" * 70)
             elif success and not transaction_hash:
                 pass
