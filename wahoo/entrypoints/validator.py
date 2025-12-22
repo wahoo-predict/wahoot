@@ -176,7 +176,7 @@ def main() -> None:
             f"  Loop interval: {loop_interval:.1f}s (override from command line)"
         )
     else:
-        loop_interval = calculate_loop_interval(metagraph)
+        loop_interval = calculate_loop_interval(metagraph, subtensor=subtensor)
         logger.info(
             f"  Loop interval: {loop_interval:.1f}s (calculated from metagraph tempo)"
         )
@@ -213,7 +213,7 @@ def main() -> None:
             # Recalculate loop interval from metagraph if not overridden
             # This allows the interval to adapt if metagraph tempo changes
             if args.loop_interval is None:
-                loop_interval = calculate_loop_interval(metagraph)
+                loop_interval = calculate_loop_interval(metagraph, subtensor=subtensor)
             logger.info(f"Sleeping for {loop_interval:.1f}s before next iteration...")
             time.sleep(loop_interval)
 

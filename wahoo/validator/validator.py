@@ -184,28 +184,62 @@ def sync_metagraph(metagraph: bt.Metagraph, subtensor: bt.Subtensor) -> bt.Metag
     return metagraph
 
 
-def calculate_loop_interval(metagraph: bt.Metagraph) -> float:
+def calculate_loop_interval(metagraph: bt.Metagraph, subtensor: Optional[bt.Subtensor] = None) -> float:
+    """
+    Calculate loop interval based on time until next epoch boundary.
+    This ensures the validator syncs with actual epoch timing, not just tempo.
+    """
     try:
+        # Get current block number
+        current_block = None
+        if subtensor is not None:
+            try:
+                current_block = subtensor.block
+            except Exception:
+                pass
+        
+        if current_block is None and hasattr(metagraph, "block") and metagraph.block is not None:
+            try:
+                current_block = int(metagraph.block.item())
+            except Exception:
+                pass
+        
+        # Get tempo or blocks_per_epoch
+        tempo = None
+        blocks_per_epoch = None
+        
         if hasattr(metagraph, "tempo") and metagraph.tempo is not None:
             tempo = int(metagraph.tempo)
-            interval = tempo * BLOCK_TIME_SECONDS 
+        elif hasattr(metagraph, "blocks_per_epoch") and metagraph.blocks_per_epoch is not None:
+            blocks_per_epoch = int(metagraph.blocks_per_epoch)
+            tempo = blocks_per_epoch  # Use blocks_per_epoch as tempo
+        
+        if tempo is not None and current_block is not None:
+            # Calculate blocks until next epoch boundary
+            blocks_since_last_epoch = current_block % tempo
+            blocks_until_next_epoch = tempo - blocks_since_last_epoch
+            
+            # Calculate time until next epoch
+            interval = blocks_until_next_epoch * BLOCK_TIME_SECONDS
+            
+            # Add a small buffer (10%) to ensure we're past the epoch boundary
+            interval = interval * 1.1
+            
             logger.info(
-                f"Calculated loop interval from tempo: {tempo} blocks = {interval:.1f}s"
+                f"Calculated loop interval: {blocks_until_next_epoch} blocks until next epoch "
+                f"= {interval:.1f}s ({interval/60:.1f} minutes)"
             )
             return max(interval, 60.0)
-        elif (
-            hasattr(metagraph, "blocks_per_epoch")
-            and metagraph.blocks_per_epoch is not None
-        ):
-            blocks_per_epoch = int(metagraph.blocks_per_epoch)
-            interval = blocks_per_epoch * BLOCK_TIME_SECONDS * 1.1
+        elif tempo is not None:
+            # Fallback: use full tempo period if we can't get current block
+            interval = tempo * BLOCK_TIME_SECONDS
             logger.info(
-                f"Calculated loop interval from blocks_per_epoch: "
-                f"{blocks_per_epoch} blocks = {interval:.1f}s"
+                f"Calculated loop interval from tempo: {tempo} blocks = {interval:.1f}s "
+                f"(could not get current block, using full tempo period)"
             )
             return max(interval, 60.0)
     except (AttributeError, TypeError, ValueError) as e:
-        logger.debug(f"Could not get tempo from metagraph: {e}")
+        logger.debug(f"Could not calculate loop interval: {e}")
 
     logger.info(
         "Using default loop interval: 4800 seconds (tempo not available from metagraph)"
@@ -301,17 +335,17 @@ def main_loop_iteration(
 
         logger.info("[4/8] Fetching WAHOO validation data...")
         try:
-            # Calculate epoch timestamps for the current Bittensor epoch
-            start_date, end_date = calculate_epoch_timestamps(subtensor, metagraph)
-
-            if not start_date or not end_date:
-                logger.warning(
-                    "Could not calculate epoch timestamps. Skipping weight setting for this epoch "
-                    "to avoid using full history. Will retry next iteration."
-                )
-                return
-
-            logger.info(f"Using epoch date range: {start_date} to {end_date}")
+            # Use a longer historical window to capture trading activity
+            # Miners may have traded over days/weeks, not just the current epoch
+            from datetime import timedelta
+            end_date_dt = datetime.now(timezone.utc)
+            start_date_dt = end_date_dt - timedelta(days=30)  # Query last 30 days of trading data
+            
+            # Convert to ISO8601 strings for API
+            start_date = start_date_dt.isoformat()
+            end_date = end_date_dt.isoformat()
+            
+            logger.info(f"Using historical date range: {start_date} to {end_date} (last 30 days)")
 
             validation_data = get_wahoo_validation_data(
                 hotkeys=hotkeys,
@@ -347,21 +381,24 @@ def main_loop_iteration(
                 if wahoo_weights is not None:
                     validation_data = []
                 else:
-                    logger.warning("No fallback weights available, skipping iteration")
-                    return
+                    # Even with no validation data, we still set weights with burn_rate to owner UID 176
+                    logger.info(
+                        "No fallback weights available, but will still set weights with "
+                        f"burn_rate ({BURN_RATE*100:.1f}%) to owner UID {OWNER_UID}"
+                    )
+                    validation_data = []  # Empty validation data - all miners get 0.0 weight
             else:
                 wahoo_weights = None
 
         except Exception as e:
             logger.error(f"Failed to fetch validation data: {e}")
             validation_data = []
-            if should_skip_weight_computation(validation_data, log_reason=True):
-                logger.warning(
-                    "No usable validation data after exception. "
-                    "Skipping weight computation and set_weights() call "
-                    "for this iteration."
-                )
-                return
+            # Even after exception, proceed to set weights with burn_rate to owner UID 176
+            logger.info(
+                "Will still set weights with burn_rate to owner UID 176 "
+                "despite validation data fetch failure"
+            )
+            wahoo_weights = None
 
         logger.info("[5/8] Getting active event ID...")
         try:
@@ -433,12 +470,14 @@ def main_loop_iteration(
             if rewards_sum > 0.0:
                 logger.info(f"✓ Rewards sum: {rewards_sum:.6f} (ready to set weights)")
             else:
-                logger.warning("All rewards are zero, skipping set_weights() call")
-                return
+                logger.info("All miner rewards are zero (no predictions), but will still set weights with burn_rate to owner UID 176")
 
             # Route burned portion (BURN_RATE) to owner/validator UID 176
             # Note: UID 176 is a validator, not a miner, so it won't be in active_uids
             # burn_rate = 50% of emissions routes to owner UID 176
+            # Even if all miner rewards are zero, we still set weights with:
+            # - 0.5 (BURN_RATE) to owner UID 176
+            # - 0.0 to all miners (no predictions)
             owner_weight = BURN_RATE  # 0.5 = 50% burn rate
             final_uids = list(active_uids)
             final_weights = rewards.clone()
@@ -485,7 +524,7 @@ def main_loop_iteration(
                 logger.info(f"Total Weight Sum: {final_weights.sum().item():.6f}")
                 logger.info("=" * 70)
             elif success and not transaction_hash:
-                pass
+                logger.info("Weights on cooldown - will retry in next commit period (this is normal)")
             else:
                 logger.warning("Failed to set weights (will retry next iteration)")
         except Exception as e:
