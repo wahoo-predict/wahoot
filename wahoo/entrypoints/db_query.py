@@ -30,9 +30,6 @@ def show_stats():
     cursor.execute("SELECT COUNT(*) FROM performance_snapshots")
     perf_count = cursor.fetchone()[0]
 
-    cursor.execute("SELECT COUNT(*) FROM validation_cache")
-    cache_count = cursor.fetchone()[0]
-
     cursor.execute("SELECT MAX(ts) FROM scoring_runs")
     latest_score = cursor.fetchone()[0]
 
@@ -46,7 +43,6 @@ def show_stats():
     print(f"Registered Miners:     {miner_count}")
     print(f"Total Score Runs:       {score_count}")
     print(f"Performance Snapshots:  {perf_count}")
-    print(f"Cached Validations:    {cache_count}")
     print(f"Latest Score:          {latest_score[:19] if latest_score else 'N/A'}")
     print(f"Latest Performance:    {latest_perf[:19] if latest_perf else 'N/A'}")
     print(f"Database Path:         {get_db_path()}")

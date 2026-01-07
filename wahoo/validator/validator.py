@@ -332,6 +332,32 @@ def main_loop_iteration(
         uid_to_hotkey = build_uid_to_hotkey(metagraph, active_uids=active_uids)
         hotkeys = [uid_to_hotkey[uid] for uid in active_uids if uid in uid_to_hotkey]
         logger.info(f"✓ Extracted {len(hotkeys)} hotkeys")
+        
+        # Sync miner metadata (UID, axon_ip) to database
+        if validator_db is not None:
+            try:
+                # Build reverse mapping: hotkey -> UID
+                hotkey_to_uid = {hotkey: uid for uid, hotkey in uid_to_hotkey.items()}
+                
+                # Try to get axon IPs from metagraph if available
+                hotkey_to_axon_ip = {}
+                if hasattr(metagraph, "axons") and metagraph.axons is not None:
+                    for uid, hotkey in uid_to_hotkey.items():
+                        try:
+                            if uid < len(metagraph.axons) and metagraph.axons[uid] is not None:
+                                axon = metagraph.axons[uid]
+                                if hasattr(axon, "ip") and axon.ip is not None:
+                                    hotkey_to_axon_ip[hotkey] = str(axon.ip)
+                        except (IndexError, AttributeError):
+                            pass
+                
+                validator_db.sync_miner_metadata(
+                    hotkey_to_uid=hotkey_to_uid,
+                    hotkey_to_axon_ip=hotkey_to_axon_ip if hotkey_to_axon_ip else None,
+                )
+                logger.debug(f"✓ Synced miner metadata for {len(hotkey_to_uid)} miners")
+            except Exception as e:
+                logger.warning(f"Failed to sync miner metadata: {e}")
 
         logger.info("[4/8] Fetching WAHOO validation data...")
         try:
@@ -413,6 +439,17 @@ def main_loop_iteration(
         if wahoo_weights is not None:
             logger.info("Using fallback weights from DB, skipping new computation")
             updated_ema_scores = {}
+            # Save fallback weights as scoring run for tracking
+            if validator_db is not None and wahoo_weights:
+                try:
+                    validator_db.add_scoring_run(
+                        wahoo_weights, reason="fallback_weights"
+                    )
+                    logger.debug(
+                        f"Saved {len(wahoo_weights)} fallback weights to database"
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to save fallback weights to DB: {e}")
         else:
             previous_ema_scores = {}
             if validator_db is not None:
@@ -439,14 +476,21 @@ def main_loop_iteration(
                 previous_scores=previous_ema_scores,
             )
 
-            if validator_db is not None and updated_ema_scores:
+            # Always save scoring run if we computed weights, even if empty
+            # This provides a record that computation occurred
+            if validator_db is not None:
                 try:
-                    validator_db.add_scoring_run(
-                        updated_ema_scores, reason="ema_update"
-                    )
-                    logger.debug(
-                        f"Saved {len(updated_ema_scores)} EMA scores to database"
-                    )
+                    # Save smoothed scores if available, otherwise save weights as fallback
+                    scores_to_save = updated_ema_scores if updated_ema_scores else wahoo_weights
+                    if scores_to_save:
+                        validator_db.add_scoring_run(
+                            scores_to_save, reason="ema_update"
+                        )
+                        logger.debug(
+                            f"Saved {len(scores_to_save)} EMA scores to database"
+                        )
+                    else:
+                        logger.debug("No scores to save (empty validation data)")
                 except Exception as e:
                     logger.warning(f"Failed to save EMA scores to DB: {e}")
 

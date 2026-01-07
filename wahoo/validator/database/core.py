@@ -57,14 +57,37 @@ class ValidatorDB(ValidatorDBInterface):
                 ),
             )
 
-            cursor.execute(
-                """
-                INSERT INTO miners (hotkey, last_seen_ts)
-                VALUES (?, ?)
-                ON CONFLICT(hotkey) DO UPDATE SET last_seen_ts = excluded.last_seen_ts
-                """,
-                (hotkey, timestamp),
-            )
+            # Check if miner already exists
+            cursor.execute("SELECT first_seen_ts FROM miners WHERE hotkey = ?", (hotkey,))
+            existing = cursor.fetchone()
+            
+            signature = data_dict.get("signature")
+            message = data_dict.get("message")
+            
+            if existing:
+                # Miner exists - update last_seen_ts, signature, and message
+                cursor.execute(
+                    """
+                    UPDATE miners 
+                    SET last_seen_ts = ?, 
+                        last_signature = COALESCE(?, last_signature),
+                        last_message = COALESCE(?, last_message)
+                    WHERE hotkey = ?
+                    """,
+                    (timestamp, signature, message, hotkey),
+                )
+            else:
+                # New miner - insert with first_seen_ts and last_seen_ts
+                cursor.execute(
+                    """
+                    INSERT INTO miners (
+                        hotkey, first_seen_ts, last_seen_ts, 
+                        last_signature, last_message
+                    )
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (hotkey, timestamp, timestamp, signature, message),
+                )
 
             conn.commit()
             conn.close()
@@ -257,6 +280,49 @@ class ValidatorDB(ValidatorDBInterface):
         except Exception as e:
             logger.error(f"Failed to retrieve latest scores: {e}")
             return {}
+
+    def sync_miner_metadata(
+        self, hotkey_to_uid: Dict[str, int], hotkey_to_axon_ip: Optional[Dict[str, str]] = None
+    ) -> None:
+        """
+        Sync miner metadata (UID, axon_ip) from metagraph.
+        
+        Args:
+            hotkey_to_uid: Dictionary mapping hotkey to UID
+            hotkey_to_axon_ip: Optional dictionary mapping hotkey to axon IP address
+        """
+        if not hotkey_to_uid:
+            return
+        
+        try:
+            conn = self._get_conn()
+            cursor = conn.cursor()
+            
+            for hotkey, uid in hotkey_to_uid.items():
+                if hotkey_to_axon_ip and hotkey in hotkey_to_axon_ip:
+                    axon_ip = hotkey_to_axon_ip[hotkey]
+                    cursor.execute(
+                        """
+                        UPDATE miners 
+                        SET uid = ?, axon_ip = ?
+                        WHERE hotkey = ?
+                        """,
+                        (uid, axon_ip, hotkey),
+                    )
+                else:
+                    cursor.execute(
+                        """
+                        UPDATE miners 
+                        SET uid = ?
+                        WHERE hotkey = ?
+                        """,
+                        (uid, hotkey),
+                    )
+            
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            logger.error(f"Failed to sync miner metadata: {e}")
 
     def remove_unregistered_miners(self, registered_hotkeys: Sequence[str]) -> int:
         if not registered_hotkeys:

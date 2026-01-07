@@ -7,11 +7,11 @@ logger = logging.getLogger(__name__)
 def get_active_uids(metagraph: Any) -> List[int]:
     """
     Get all registered miner UIDs from the metagraph.
-    Filters out validators (UIDs with stake > 0) since validators should not
+    Filters out validators (UIDs with validator_permit=True) since validators should not
     receive weights - only miners should.
     
     In this subnet, miners are not required to run code or set axon info,
-    so we return all registered UIDs with zero stake rather than filtering by axon IP/port.
+    so we return all registered UIDs without validator permits.
     """
     active_uids: List[int] = []
 
@@ -26,30 +26,37 @@ def get_active_uids(metagraph: Any) -> List[int]:
             logger.warning("Metagraph does not have 'uids' or 'hotkeys' attribute")
             return active_uids
 
-        # Filter out validators (UIDs with stake > 0)
-        # Only include miners (UIDs with stake = 0)
-        if hasattr(metagraph, "S") and metagraph.S is not None:
-            stakes = metagraph.S
+        # Filter out validators using validator_permit
+        if hasattr(metagraph, "validator_permit") and metagraph.validator_permit is not None:
+            validator_permit = metagraph.validator_permit
             for uid in all_uids:
                 try:
-                    stake = stakes[uid].item() if hasattr(stakes[uid], 'item') else float(stakes[uid])
-                    # Only include UIDs with zero stake (miners)
-                    if stake == 0:
+                    # Check if this UID has a validator permit
+                    is_validator = validator_permit[uid]
+                    if hasattr(is_validator, 'item'):
+                        is_validator = bool(is_validator.item())
+                    else:
+                        is_validator = bool(is_validator)
+                    
+                    # Only include UIDs without validator permit (miners)
+                    if not is_validator:
                         active_uids.append(uid)
-                except (IndexError, AttributeError, TypeError):
-                    # If we can't get stake, include the UID (fallback to old behavior)
-                    active_uids.append(uid)
+                    else:
+                        # UID out of bounds for validator_permit array
+                        logger.debug(f"UID {uid} out of bounds for validator_permit array")
+                except (IndexError, AttributeError, TypeError) as e:
+                    logger.error(f"Error checking validator_permit for UID {uid}: {e}")
             
             validator_count = len(all_uids) - len(active_uids)
             logger.info(
                 f"Found {len(all_uids)} total registered UIDs: "
-                f"{len(active_uids)} miners (stake=0), {validator_count} validators (stake>0)"
+                f"{len(active_uids)} miners (validator_permit=False), {validator_count} validators (validator_permit=True)"
             )
         else:
-            # Fallback: if we can't check stake, return all UIDs
-            logger.warning("Metagraph does not have 'S' (stake) attribute, returning all UIDs")
+            # Fallback: if we can't check validator_permit, return all UIDs
+            logger.warning("Metagraph does not have 'validator_permit' attribute, returning all UIDs")
             active_uids = all_uids
-            logger.info(f"Found {len(active_uids)} registered UIDs from metagraph.uids")
+            logger.info(f"Found {len(active_uids)} registered UIDs from metagraph.uids (validator_permit check unavailable)")
 
         return active_uids
 
