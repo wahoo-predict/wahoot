@@ -67,7 +67,7 @@ class ValidationRecord(BaseModel):
     signature: Optional[str] = None
     message: Optional[str] = None
     performance: PerformanceMetrics = Field(default_factory=PerformanceMetrics)
-    wahoo_user_id: Optional[str] = Field(default=None, alias="wahoo_user_id")
+    wahoo_user_id: Optional[str] = Field(default=None, alias="userId")
 
     @field_validator("hotkey")
     @classmethod

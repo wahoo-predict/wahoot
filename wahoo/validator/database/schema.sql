@@ -49,4 +49,23 @@ CREATE TABLE IF NOT EXISTS scoring_runs (
 CREATE INDEX IF NOT EXISTS idx_scoring_hotkey_ts
     ON scoring_runs(hotkey, ts DESC);
 
+-- User-Hotkey bindings table for tracking userId -> hotkey mappings
+-- This tracks which Wahoo account (userId) is linked to which miner hotkey
+CREATE TABLE IF NOT EXISTS user_hotkey_bindings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT,                     
+    hotkey TEXT NOT NULL UNIQUE,
+    first_seen_at TEXT NOT NULL, 
+    last_updated_at TEXT NOT NULL,
+    previous_user_id TEXT,
+    
+    FOREIGN KEY(hotkey) REFERENCES miners(hotkey)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_hotkey_bindings_user_id
+    ON user_hotkey_bindings(user_id);
+
+CREATE INDEX IF NOT EXISTS idx_user_hotkey_bindings_hotkey
+    ON user_hotkey_bindings(hotkey);
+
 
