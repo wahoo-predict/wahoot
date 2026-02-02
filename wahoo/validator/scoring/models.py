@@ -7,6 +7,7 @@ class PerformanceMetrics(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
     total_volume_usd: Optional[float] = Field(default=None, alias="total_volume_usd")
+    weighted_volume: Optional[float] = Field(default=None, alias="weighted_volume")
     trade_count: Optional[int] = Field(default=None, alias="trade_count")
     realized_profit_usd: Optional[float] = Field(
         default=None, alias="realized_profit_usd"
@@ -31,6 +32,7 @@ class PerformanceMetrics(BaseModel):
 
     _float_fields = (
         "total_volume_usd",
+        "weighted_volume",
         "realized_profit_usd",
         "unrealized_profit_usd",
         "win_rate",
@@ -67,7 +69,7 @@ class ValidationRecord(BaseModel):
     signature: Optional[str] = None
     message: Optional[str] = None
     performance: PerformanceMetrics = Field(default_factory=PerformanceMetrics)
-    wahoo_user_id: Optional[str] = Field(default=None, alias="wahoo_user_id")
+    wahoo_user_id: Optional[str] = Field(default=None, alias="userId")
 
     @field_validator("hotkey")
     @classmethod

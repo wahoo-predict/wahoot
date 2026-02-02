@@ -13,10 +13,11 @@ def has_usable_metrics(record: ValidationRecord) -> bool:
     perf = record.performance
 
     has_volume = perf.total_volume_usd is not None and perf.total_volume_usd > 0
+    has_weighted_volume = perf.weighted_volume is not None and perf.weighted_volume > 0
     has_profit = perf.realized_profit_usd is not None
     has_trades = perf.trade_count is not None and perf.trade_count > 0
 
-    return has_volume or has_profit or has_trades
+    return has_weighted_volume or has_volume or has_profit or has_trades
 
 
 def filter_usable_records(records: List[ValidationRecord]) -> List[ValidationRecord]:

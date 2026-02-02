@@ -30,6 +30,9 @@ def show_stats():
     cursor.execute("SELECT COUNT(*) FROM performance_snapshots")
     perf_count = cursor.fetchone()[0]
 
+    cursor.execute("SELECT COUNT(*) FROM validation_cache")
+    cache_count = cursor.fetchone()[0]
+
     cursor.execute("SELECT MAX(ts) FROM scoring_runs")
     latest_score = cursor.fetchone()[0]
 
@@ -43,6 +46,7 @@ def show_stats():
     print(f"Registered Miners:     {miner_count}")
     print(f"Total Score Runs:       {score_count}")
     print(f"Performance Snapshots:  {perf_count}")
+    print(f"Cached Validations:    {cache_count}")
     print(f"Latest Score:          {latest_score[:19] if latest_score else 'N/A'}")
     print(f"Latest Performance:    {latest_perf[:19] if latest_perf else 'N/A'}")
     print(f"Database Path:         {get_db_path()}")
@@ -162,7 +166,7 @@ def show_performance(hotkey: Optional[str] = None, limit: int = 10):
     if hotkey:
         cursor.execute(
             """
-            SELECT timestamp, hotkey, total_volume_usd, trade_count,
+            SELECT timestamp, hotkey, weighted_volume, trade_count,
                    realized_profit_usd, win_rate, activity_score
             FROM performance_snapshots
             WHERE hotkey = ?
@@ -174,7 +178,7 @@ def show_performance(hotkey: Optional[str] = None, limit: int = 10):
     else:
         cursor.execute(
             """
-            SELECT timestamp, hotkey, total_volume_usd, trade_count,
+            SELECT timestamp, hotkey, weighted_volume, trade_count,
                    realized_profit_usd, win_rate, activity_score
             FROM performance_snapshots
             ORDER BY timestamp DESC
@@ -215,7 +219,7 @@ def show_volume():
 
     cursor.execute(
         """
-        SELECT ps.hotkey, ps.total_volume_usd, ps.trade_count, ps.timestamp, m.uid
+        SELECT ps.hotkey, ps.weighted_volume, ps.trade_count, ps.timestamp, m.uid
         FROM performance_snapshots ps
         INNER JOIN (
             SELECT hotkey, MAX(timestamp) as max_ts
@@ -223,7 +227,7 @@ def show_volume():
             GROUP BY hotkey
         ) latest ON ps.hotkey = latest.hotkey AND ps.timestamp = latest.max_ts
         LEFT JOIN miners m ON ps.hotkey = m.hotkey
-        ORDER BY ps.total_volume_usd DESC NULLS LAST, ps.trade_count DESC NULLS LAST
+        ORDER BY ps.weighted_volume DESC NULLS LAST, ps.trade_count DESC NULLS LAST
     """
     )
     rows = cursor.fetchall()
@@ -322,7 +326,7 @@ def show_miner_details(hotkey: str):
 
     cursor.execute(
         """
-        SELECT total_volume_usd, trade_count, realized_profit_usd,
+        SELECT weighted_volume, trade_count, realized_profit_usd,
                win_rate, activity_score, timestamp
         FROM performance_snapshots
         WHERE hotkey = ?

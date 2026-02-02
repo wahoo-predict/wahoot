@@ -1,9 +1,9 @@
 import logging
 import os
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from ..api.client import ValidatorDBInterface
 from .validator_db import get_or_create_database
@@ -37,7 +37,7 @@ class ValidatorDB(ValidatorDBInterface):
                 """
                 INSERT INTO performance_snapshots (
                     hotkey, timestamp,
-                    total_volume_usd, trade_count, realized_profit_usd,
+                    total_volume_usd, weighted_volume, trade_count, realized_profit_usd,
                     unrealized_profit_usd, win_rate, total_fees_paid_usd,
                     open_positions_count, referral_count, referral_volume
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -46,6 +46,7 @@ class ValidatorDB(ValidatorDBInterface):
                     hotkey,
                     timestamp,
                     perf.get("total_volume_usd"),
+                    perf.get("weighted_volume"),
                     perf.get("trade_count"),
                     perf.get("realized_profit_usd"),
                     perf.get("unrealized_profit_usd"),
@@ -57,37 +58,14 @@ class ValidatorDB(ValidatorDBInterface):
                 ),
             )
 
-            # Check if miner already exists
-            cursor.execute("SELECT first_seen_ts FROM miners WHERE hotkey = ?", (hotkey,))
-            existing = cursor.fetchone()
-            
-            signature = data_dict.get("signature")
-            message = data_dict.get("message")
-            
-            if existing:
-                # Miner exists - update last_seen_ts, signature, and message
-                cursor.execute(
-                    """
-                    UPDATE miners 
-                    SET last_seen_ts = ?, 
-                        last_signature = COALESCE(?, last_signature),
-                        last_message = COALESCE(?, last_message)
-                    WHERE hotkey = ?
-                    """,
-                    (timestamp, signature, message, hotkey),
-                )
-            else:
-                # New miner - insert with first_seen_ts and last_seen_ts
-                cursor.execute(
-                    """
-                    INSERT INTO miners (
-                        hotkey, first_seen_ts, last_seen_ts, 
-                        last_signature, last_message
-                    )
-                    VALUES (?, ?, ?, ?, ?)
-                    """,
-                    (hotkey, timestamp, timestamp, signature, message),
-                )
+            cursor.execute(
+                """
+                INSERT INTO miners (hotkey, last_seen_ts)
+                VALUES (?, ?)
+                ON CONFLICT(hotkey) DO UPDATE SET last_seen_ts = excluded.last_seen_ts
+                """,
+                (hotkey, timestamp),
+            )
 
             conn.commit()
             conn.close()
@@ -135,6 +113,7 @@ class ValidatorDB(ValidatorDBInterface):
                 data = dict(row)
                 perf = {
                     "total_volume_usd": data["total_volume_usd"],
+                    "weighted_volume": data["weighted_volume"],
                     "trade_count": data["trade_count"],
                     "realized_profit_usd": data["realized_profit_usd"],
                     "unrealized_profit_usd": data["unrealized_profit_usd"],
@@ -284,13 +263,6 @@ class ValidatorDB(ValidatorDBInterface):
     def sync_miner_metadata(
         self, hotkey_to_uid: Dict[str, int], hotkey_to_axon_ip: Optional[Dict[str, str]] = None
     ) -> None:
-        """
-        Sync miner metadata (UID, axon_ip) from metagraph.
-        
-        Args:
-            hotkey_to_uid: Dictionary mapping hotkey to UID
-            hotkey_to_axon_ip: Optional dictionary mapping hotkey to axon IP address
-        """
         if not hotkey_to_uid:
             return
         
@@ -361,6 +333,12 @@ class ValidatorDB(ValidatorDBInterface):
             )
             scoring_runs_deleted = cursor.rowcount
 
+            cursor.execute(
+                f"DELETE FROM user_hotkey_bindings WHERE hotkey IN ({placeholders})",
+                list(unregistered_hotkeys),
+            )
+            bindings_deleted = cursor.rowcount
+
             # Finally delete from miners table
             cursor.execute(
                 f"DELETE FROM miners WHERE hotkey IN ({placeholders})",
@@ -381,3 +359,123 @@ class ValidatorDB(ValidatorDBInterface):
         except Exception as e:
             logger.error(f"Failed to remove unregistered miners: {e}")
             return 0
+
+    def _ensure_bindings_table(self, conn: sqlite3.Connection) -> None:
+        """Ensure the user_hotkey_bindings table exists (for schema migration)."""
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS user_hotkey_bindings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT,
+                hotkey TEXT NOT NULL UNIQUE,
+                first_seen_at TEXT NOT NULL,
+                last_updated_at TEXT NOT NULL,
+                previous_user_id TEXT,
+                FOREIGN KEY(hotkey) REFERENCES miners(hotkey)
+            )
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_user_hotkey_bindings_user_id
+            ON user_hotkey_bindings(user_id)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_user_hotkey_bindings_hotkey
+            ON user_hotkey_bindings(hotkey)
+        """)
+        conn.commit()
+
+    def get_binding_for_hotkey(self, hotkey: str) -> Optional[Dict[str, Any]]:
+        try:
+            conn = self._get_conn()
+            self._ensure_bindings_table(conn)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
+            cursor.execute(
+                "SELECT * FROM user_hotkey_bindings WHERE hotkey = ?",
+                (hotkey,)
+            )
+            row = cursor.fetchone()
+            conn.close()
+            
+            if row:
+                return dict(row)
+            return None
+        except Exception as e:
+            logger.error(f"Failed to get binding for hotkey {hotkey}: {e}")
+            return None
+
+    def update_user_hotkey_binding(
+        self, 
+        user_id: Optional[str], 
+        hotkey: str
+    ) -> Tuple[Optional[str], bool]:
+        try:
+            conn = self._get_conn()
+            self._ensure_bindings_table(conn)
+            cursor = conn.cursor()
+            
+            now = datetime.now(timezone.utc)
+            now_str = now.isoformat()
+            
+            # Get existing binding for this hotkey
+            cursor.execute(
+                "SELECT user_id, first_seen_at FROM user_hotkey_bindings WHERE hotkey = ?",
+                (hotkey,)
+            )
+            existing = cursor.fetchone()
+            
+            if existing is None:
+                # No existing binding - create new one
+                cursor.execute(
+                    """
+                    INSERT INTO user_hotkey_bindings 
+                    (user_id, hotkey, first_seen_at, last_updated_at)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (user_id, hotkey, now_str, now_str)
+                )
+                conn.commit()
+                conn.close()
+                
+                if user_id:
+                    logger.debug(
+                        f"New user-hotkey binding: user={user_id[:16]}... -> hotkey={hotkey[:16]}..."
+                    )
+                else:
+                    logger.debug(f"New hotkey tracked (no userId): hotkey={hotkey[:16]}...")
+                
+                return None, True  # New hotkey, no previous userId
+            
+            # Existing binding found
+            existing_user_id = existing[0]  # user_id column
+            
+            # Check if userId has changed
+            if existing_user_id == user_id:
+                # Same user (or both None) - just update timestamp
+                cursor.execute(
+                    "UPDATE user_hotkey_bindings SET last_updated_at = ? WHERE hotkey = ?",
+                    (now_str, hotkey)
+                )
+                conn.commit()
+                conn.close()
+                return None, False  # No change
+            
+            # userId has changed - update binding and record previous
+            cursor.execute(
+                """
+                UPDATE user_hotkey_bindings 
+                SET user_id = ?, last_updated_at = ?, previous_user_id = ?
+                WHERE hotkey = ?
+                """,
+                (user_id, now_str, existing_user_id, hotkey)
+            )
+            conn.commit()
+            conn.close()
+            
+            # Return the previous userId (only if it was non-None)
+            return existing_user_id, False
+            
+        except Exception as e:
+            logger.error(f"Failed to update binding for hotkey {hotkey}: {e}")
+            return None, False

@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 WAHOO_API_URL = "https://api.wahoopredict.com"
 WAHOO_VALIDATION_ENDPOINT = (
-    "https://api.wahoopredict.com/api/v2/event/bittensor/statistics"
+    "https://api.wahoopredict.com/api/v2/event/bittensor/statistics/v2"
 )
 
 BLOCK_TIME_SECONDS = 12.0
@@ -286,6 +286,45 @@ def compute_weights(
     return weights, updated_scores
 
 
+def _track_user_hotkey_changes(
+    validator_db: Any,
+    validation_data: List[Any],
+    previous_scores: Dict[str, float],
+    new_scores: Dict[str, float],
+) -> None:
+    for record in validation_data:
+        hotkey = record.hotkey
+        user_id = getattr(record, 'wahoo_user_id', None)
+        
+        # Get volume from the record for logging
+        volume = 0.0
+        if hasattr(record, 'performance') and record.performance:
+            volume = getattr(record.performance, 'total_volume_usd', 0.0) or 0.0
+        
+        # Update binding and check for userId changes
+        previous_user_id, is_new_hotkey = validator_db.update_user_hotkey_binding(
+            user_id=user_id,
+            hotkey=hotkey,
+        )
+        
+        # Log if userId changed (and this is not a new hotkey and previous userId was not None)
+        if previous_user_id is not None and not is_new_hotkey:
+            # Get previous and new weights/scores
+            prev_weight = previous_scores.get(hotkey, 0.0)
+            new_weight = new_scores.get(hotkey, 0.0)
+            
+            # Log the userId change with all required information
+            logger.warning(
+                f"USER_ID_CHANGE DETECTED: "
+                f"hotkey={hotkey}, "
+                f"previous_userId={previous_user_id}, "
+                f"new_userId={user_id}, "
+                f"previous_weight={prev_weight:.6f}, "
+                f"new_weight={new_weight:.6f}, "
+                f"new_volume=${volume:.2f}"
+            )
+
+
 def main_loop_iteration(
     wallet: bt.Wallet,
     subtensor: bt.Subtensor,
@@ -475,6 +514,19 @@ def main_loop_iteration(
                 uid_to_hotkey=uid_to_hotkey,
                 previous_scores=previous_ema_scores,
             )
+
+            # Track user-hotkey bindings and log any userId changes
+            # This detects when a hotkey becomes linked to a different Wahoo account
+            if validator_db is not None and validation_data:
+                try:
+                    _track_user_hotkey_changes(
+                        validator_db=validator_db,
+                        validation_data=validation_data,
+                        previous_scores=previous_ema_scores,
+                        new_scores=updated_ema_scores,
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to track user-hotkey bindings: {e}")
 
             # Always save scoring run if we computed weights, even if empty
             # This provides a record that computation occurred
