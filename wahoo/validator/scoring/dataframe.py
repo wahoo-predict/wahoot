@@ -8,6 +8,7 @@ from .models import PerformanceMetrics, ValidationRecord
 
 FLOAT_COLUMNS = [
     "total_volume_usd",
+    "weighted_volume",
     "realized_profit_usd",
     "unrealized_profit_usd",
     "win_rate",

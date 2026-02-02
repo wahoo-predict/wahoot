@@ -39,8 +39,26 @@ def get_or_create_database(db_path: Optional[Path] = None) -> sqlite3.Connection
                 schema_sql = f.read()
             conn.executescript(schema_sql)
             conn.commit()
+    else:
+        # Run migrations for existing databases
+        _run_migrations(conn)
 
     return conn
+
+
+def _run_migrations(conn: sqlite3.Connection) -> None:
+    """Run schema migrations for existing databases."""
+    cursor = conn.cursor()
+    
+    # Migration: Add weighted_volume column to performance_snapshots if missing
+    cursor.execute("PRAGMA table_info(performance_snapshots)")
+    columns = {row[1] for row in cursor.fetchall()}
+    
+    if "weighted_volume" not in columns:
+        cursor.execute(
+            "ALTER TABLE performance_snapshots ADD COLUMN weighted_volume REAL"
+        )
+        conn.commit()
 
 
 def check_database_exists(db_path: Optional[Path] = None) -> bool:

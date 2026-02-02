@@ -40,7 +40,7 @@ class ValidatorDB(ValidatorDBInterface):
                     total_volume_usd, weighted_volume, trade_count, realized_profit_usd,
                     unrealized_profit_usd, win_rate, total_fees_paid_usd,
                     open_positions_count, referral_count, referral_volume
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     hotkey,

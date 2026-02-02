@@ -16,11 +16,11 @@ MIN_VOLUME_USD = 0.0
 MIN_WIN_RATE = 0.0
 
 # Burn mechanism: percentage of emissions that go to miners vs owner
-# Hardcoded to 0.5 = 50% to miners, 50% to owner (ensures validator consensus)
-MINER_EMISSION_PERCENTAGE = 0.5
-BURN_RATE = 1.0 - MINER_EMISSION_PERCENTAGE  # 0.5 = 50% burn rate
+# Hardcoded to 0.5 = 75% to miners, 25% to owner (ensures validator consensus)
+MINER_EMISSION_PERCENTAGE = 0.75
+BURN_RATE = 1.0 - MINER_EMISSION_PERCENTAGE  # 0.75 = 75% burn rate
 
-# Owner/Validator UID that receives the burned portion (50% of emissions)
+# Owner/Validator UID that receives the burned portion (25% of emissions)
 OWNER_UID = 176
 
 
