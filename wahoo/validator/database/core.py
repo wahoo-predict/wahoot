@@ -1,9 +1,9 @@
 import logging
 import os
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from ..api.client import ValidatorDBInterface
 from .validator_db import get_or_create_database
