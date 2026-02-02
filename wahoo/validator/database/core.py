@@ -1,9 +1,9 @@
 import logging
 import os
 import sqlite3
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence
 
 from ..api.client import ValidatorDBInterface
 from .validator_db import get_or_create_database
@@ -37,7 +37,7 @@ class ValidatorDB(ValidatorDBInterface):
                 """
                 INSERT INTO performance_snapshots (
                     hotkey, timestamp,
-                    total_volume_usd, trade_count, realized_profit_usd,
+                    total_volume_usd, weighted_volume, trade_count, realized_profit_usd,
                     unrealized_profit_usd, win_rate, total_fees_paid_usd,
                     open_positions_count, referral_count, referral_volume
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -46,6 +46,7 @@ class ValidatorDB(ValidatorDBInterface):
                     hotkey,
                     timestamp,
                     perf.get("total_volume_usd"),
+                    perf.get("weighted_volume"),
                     perf.get("trade_count"),
                     perf.get("realized_profit_usd"),
                     perf.get("unrealized_profit_usd"),
@@ -57,37 +58,14 @@ class ValidatorDB(ValidatorDBInterface):
                 ),
             )
 
-            # Check if miner already exists
-            cursor.execute("SELECT first_seen_ts FROM miners WHERE hotkey = ?", (hotkey,))
-            existing = cursor.fetchone()
-            
-            signature = data_dict.get("signature")
-            message = data_dict.get("message")
-            
-            if existing:
-                # Miner exists - update last_seen_ts, signature, and message
-                cursor.execute(
-                    """
-                    UPDATE miners 
-                    SET last_seen_ts = ?, 
-                        last_signature = COALESCE(?, last_signature),
-                        last_message = COALESCE(?, last_message)
-                    WHERE hotkey = ?
-                    """,
-                    (timestamp, signature, message, hotkey),
-                )
-            else:
-                # New miner - insert with first_seen_ts and last_seen_ts
-                cursor.execute(
-                    """
-                    INSERT INTO miners (
-                        hotkey, first_seen_ts, last_seen_ts, 
-                        last_signature, last_message
-                    )
-                    VALUES (?, ?, ?, ?, ?)
-                    """,
-                    (hotkey, timestamp, timestamp, signature, message),
-                )
+            cursor.execute(
+                """
+                INSERT INTO miners (hotkey, last_seen_ts)
+                VALUES (?, ?)
+                ON CONFLICT(hotkey) DO UPDATE SET last_seen_ts = excluded.last_seen_ts
+                """,
+                (hotkey, timestamp),
+            )
 
             conn.commit()
             conn.close()
@@ -135,6 +113,7 @@ class ValidatorDB(ValidatorDBInterface):
                 data = dict(row)
                 perf = {
                     "total_volume_usd": data["total_volume_usd"],
+                    "weighted_volume": data["weighted_volume"],
                     "trade_count": data["trade_count"],
                     "realized_profit_usd": data["realized_profit_usd"],
                     "unrealized_profit_usd": data["unrealized_profit_usd"],
@@ -179,6 +158,16 @@ class ValidatorDB(ValidatorDBInterface):
         snapshot_retention_days: Optional[int] = None,
         scoring_retention_days: Optional[int] = None,
     ) -> Dict[str, int]:
+        """
+        Clean up old database entries automatically.
+
+        Args:
+            snapshot_retention_days: Days to keep performance_snapshots (default: 3)
+            scoring_retention_days: Days to keep scoring_runs (default: 7)
+
+        Returns:
+            Dict with 'snapshots_deleted' and 'scoring_runs_deleted' counts
+        """
         if snapshot_retention_days is None:
             snapshot_retention_days = DEFAULT_SNAPSHOT_RETENTION_DAYS
         if scoring_retention_days is None:
@@ -363,8 +352,7 @@ class ValidatorDB(ValidatorDBInterface):
             logger.info(
                 f"Removed {miners_deleted} unregistered miners from database: "
                 f"{snapshots_deleted} performance snapshots, "
-                f"{scoring_runs_deleted} scoring runs, "
-                f"{bindings_deleted} user bindings deleted"
+                f"{scoring_runs_deleted} scoring runs deleted"
             )
 
             return miners_deleted

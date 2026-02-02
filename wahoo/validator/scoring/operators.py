@@ -39,6 +39,7 @@ class Operator(ABC):
     required_columns: Sequence[str] = (
         "hotkey",
         "total_volume_usd",
+        "weighted_volume",
         "realized_profit_usd",
         "unrealized_profit_usd",
     )
@@ -57,6 +58,7 @@ class EMAVolumeScorer(Operator):
     required_columns = (
         "hotkey",
         "total_volume_usd",
+        "weighted_volume",
         "realized_profit_usd",
         "unrealized_profit_usd",
     )
@@ -76,7 +78,7 @@ class EMAVolumeScorer(Operator):
             previous_scores = {}
 
         hotkeys = df["hotkey"].to_numpy()
-        volume = np.maximum(df["total_volume_usd"].fillna(0).to_numpy(dtype=float), 0.0)
+        volume = np.maximum(df["weighted_volume"].fillna(0).to_numpy(dtype=float), 0.0)
         realized_pnl = df["realized_profit_usd"].fillna(0).to_numpy(dtype=float)
         unrealized_pnl = df["unrealized_profit_usd"].fillna(0).to_numpy(dtype=float)
 

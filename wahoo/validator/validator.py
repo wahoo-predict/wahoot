@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 WAHOO_API_URL = "https://api.wahoopredict.com"
 WAHOO_VALIDATION_ENDPOINT = (
-    "https://api.wahoopredict.com/api/v2/event/bittensor/statistics"
+    "https://api.wahoopredict.com/api/v2/event/bittensor/statistics/v2"
 )
 
 BLOCK_TIME_SECONDS = 12.0

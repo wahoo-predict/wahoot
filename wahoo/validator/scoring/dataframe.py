@@ -94,6 +94,7 @@ def ensure_required_columns(
         or [
             "hotkey",
             "total_volume_usd",
+            "weighted_volume",
             "realized_profit_usd",
             "unrealized_profit_usd",
         ]

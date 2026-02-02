@@ -28,7 +28,7 @@ def validate_validation_record(record: Dict[str, Any]) -> bool:
     )
     performance = record.get("performance", {})
 
-    required_numeric_fields = ["total_volume_usd", "realized_profit_usd"]
+    required_numeric_fields = ["weighted_volume", "realized_profit_usd"]
 
     for field_name in required_numeric_fields:
         if has_performance:

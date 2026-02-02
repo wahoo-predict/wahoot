@@ -105,7 +105,7 @@ def _check_thresholds(record: ValidationRecord) -> tuple[bool, Optional[str]]:
 
     perf = record.performance
 
-    volume = perf.total_volume_usd
+    volume = perf.weighted_volume
     if volume is None or volume < MIN_VOLUME_USD:
         return False, f"volume below threshold (volume={volume}, min={MIN_VOLUME_USD})"
 

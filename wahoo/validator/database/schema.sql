@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS performance_snapshots (
     timestamp TEXT NOT NULL,  -- ISO8601 'YYYY-MM-DDTHH:MM:SSZ'
     
     total_volume_usd REAL,
+    weighted_volume REAL,
     trade_count INTEGER,
     realized_profit_usd REAL,
     unrealized_profit_usd REAL,

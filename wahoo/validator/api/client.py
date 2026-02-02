@@ -17,7 +17,7 @@ from .fallback import filter_usable_records
 load_dotenv()
 
 DEFAULT_VALIDATION_ENDPOINT = (
-    "https://api.wahoopredict.com/api/v2/event/bittensor/statistics"
+    "https://api.wahoopredict.com/api/v2/event/bittensor/statistics/v2"
 )
 
 RETRY_STATUS_CODES = {429}
@@ -335,20 +335,65 @@ class ValidatorDBInterface:
         raise NotImplementedError
 
     def delete_cached_validation_data(self, hotkeys: Sequence[str]) -> None:
+        """
+        Delete cached validation data for given hotkeys.
+
+        Args:
+            hotkeys: List of hotkeys to delete from cache
+
+        Note:
+            This method is optional. If not implemented, invalid cache entries
+            will be skipped but not deleted.
+        """
         raise NotImplementedError
 
     def cleanup_old_cache(self, max_age_days: int = 7) -> int:
+        """
+        Delete cache entries older than max_age_days and run VACUUM.
+
+        Args:
+            max_age_days: Delete entries older than this many days (default: 7)
+
+        Returns:
+            Number of entries deleted
+
+        Note:
+            Should run VACUUM after deletion to reclaim disk space.
+        """
         raise NotImplementedError
 
     def add_scoring_run(
         self, scores: Dict[str, float], reason: str = "ema_update"
     ) -> None:
+        """
+        Save EMA scores to DB.
+
+        Args:
+            scores: Dictionary of hotkey -> score
+            reason: Reason for the update (default: "ema_update")
+        """
         raise NotImplementedError
 
     def get_latest_scores(self) -> Dict[str, float]:
+        """
+        Retrieve the most recent score for every hotkey.
+
+        Returns:
+            Dictionary of hotkey -> score
+        """
         raise NotImplementedError
 
     def remove_unregistered_miners(self, registered_hotkeys: Sequence[str]) -> int:
+        """
+        Remove all miners from the database that are not in the registered_hotkeys list.
+        This deletes entries from miners, performance_snapshots, and scoring_runs tables.
+
+        Args:
+            registered_hotkeys: List of hotkeys that are currently registered
+
+        Returns:
+            Number of miners removed
+        """
         raise NotImplementedError
 
 
