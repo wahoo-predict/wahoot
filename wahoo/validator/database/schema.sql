@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS miners (
     uid INTEGER,
     last_signature TEXT,
     last_message TEXT,
-    first_seen_ts TEXT, -- ISO8601 string; SQLite stores as TEXT
+    first_seen_ts TEXT,
     last_seen_ts TEXT,
     axon_ip TEXT
 );
@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS miners (
 CREATE TABLE IF NOT EXISTS performance_snapshots (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     hotkey TEXT NOT NULL,
-    timestamp TEXT NOT NULL,  -- ISO8601 'YYYY-MM-DDTHH:MM:SSZ'
+    timestamp TEXT NOT NULL,
     
     total_volume_usd REAL,
     weighted_volume REAL,
@@ -50,8 +50,6 @@ CREATE TABLE IF NOT EXISTS scoring_runs (
 CREATE INDEX IF NOT EXISTS idx_scoring_hotkey_ts
     ON scoring_runs(hotkey, ts DESC);
 
--- User-Hotkey bindings table for tracking userId -> hotkey mappings
--- This tracks which Wahoo account (userId) is linked to which miner hotkey
 CREATE TABLE IF NOT EXISTS user_hotkey_bindings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id TEXT,                     
