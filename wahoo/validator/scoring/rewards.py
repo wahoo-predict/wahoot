@@ -12,7 +12,6 @@ logger = logging.getLogger(__name__)
 USE_EQUAL_WEIGHTS_FALLBACK = (
     os.getenv("USE_EQUAL_WEIGHTS_FALLBACK", "false").lower() == "true"
 )
-MIN_VOLUME_USD = 0.0
 MIN_WIN_RATE = 0.0
 
 # Burn mechanism: percentage of emissions that go to miners vs owner
@@ -105,9 +104,9 @@ def _check_thresholds(record: ValidationRecord) -> tuple[bool, Optional[str]]:
 
     perf = record.performance
 
-    volume = perf.weighted_volume
-    if volume is None or volume < MIN_VOLUME_USD:
-        return False, f"volume below threshold (volume={volume}, min={MIN_VOLUME_USD})"
+    profit = perf.profit
+    if profit is None or profit <= 0:
+        return False, f"profit not positive (profit={profit})"
 
     win_rate = perf.win_rate
     if win_rate is not None and win_rate < MIN_WIN_RATE:
@@ -245,7 +244,7 @@ def reward(
     if total > 0.0:
         # Normalize to sum to 1.0 first, then scale by MINER_EMISSION_PERCENTAGE
         # This implements the burn mechanism: only MINER_EMISSION_PERCENTAGE goes to miners
-        # The remaining BURN_RATE (50%) will be routed to owner UID 176
+        # The remaining BURN_RATE will be routed to owner UID 176
         rewards = rewards / total * MINER_EMISSION_PERCENTAGE
         logger.info(
             f"Applied {MINER_EMISSION_PERCENTAGE*100:.1f}% miner emissions "

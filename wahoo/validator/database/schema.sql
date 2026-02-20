@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS performance_snapshots (
     
     total_volume_usd REAL,
     weighted_volume REAL,
+    profit REAL,
     trade_count INTEGER,
     realized_profit_usd REAL,
     unrealized_profit_usd REAL,

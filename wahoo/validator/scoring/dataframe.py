@@ -9,6 +9,7 @@ from .models import PerformanceMetrics, ValidationRecord
 FLOAT_COLUMNS = [
     "total_volume_usd",
     "weighted_volume",
+    "profit",
     "realized_profit_usd",
     "unrealized_profit_usd",
     "win_rate",
@@ -96,6 +97,7 @@ def ensure_required_columns(
             "hotkey",
             "total_volume_usd",
             "weighted_volume",
+            "profit",
             "realized_profit_usd",
             "unrealized_profit_usd",
         ]

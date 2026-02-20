@@ -400,22 +400,15 @@ def main_loop_iteration(
 
         logger.info("[4/8] Fetching WAHOO validation data...")
         try:
-            # Use a longer historical window to capture trading activity
-            # Miners may have traded over days/weeks, not just the current epoch
             from datetime import timedelta
-            end_date_dt = datetime.now(timezone.utc)
-            start_date_dt = end_date_dt - timedelta(days=30)  # Query last 30 days of trading data
-            
-            # Convert to ISO8601 strings for API
+            start_date_dt = datetime.now(timezone.utc) - timedelta(days=3)
             start_date = start_date_dt.isoformat()
-            end_date = end_date_dt.isoformat()
-            
-            logger.info(f"Using historical date range: {start_date} to {end_date} (last 30 days)")
+
+            logger.info(f"Using historical start date: {start_date} (last 3 days)")
 
             validation_data = get_wahoo_validation_data(
                 hotkeys=hotkeys,
                 start_date=start_date,
-                end_date=end_date,
                 api_base_url=config.get("wahoo_validation_endpoint"),
                 validator_db=validator_db,
             )
