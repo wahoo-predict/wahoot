@@ -10,7 +10,7 @@ from wahoo.validator.validator import (
     main_loop_iteration,
 )
 from wahoo.validator.database.core import ValidatorDB
-from wahoo.validator.database.validator_db import check_database_exists, get_db_path
+from wahoo.validator.database.validator_db import check_database_exists, get_db_path, run_alembic_migrations
 from wahoo.validator.init import initialize
 
 
@@ -130,6 +130,13 @@ def main() -> None:
             logger.info("Continuing anyway...")
     else:
         logger.debug(f"Database exists at {db_path}")
+
+    # Run alembic migrations to ensure schema is up to date
+    try:
+        run_alembic_migrations(db_path)
+    except Exception as e:
+        logger.warning(f"Failed to run migrations: {e}")
+        logger.info("Continuing with existing schema...")
 
     if not args.wallet_name or not args.hotkey_name:
         logger.error(

@@ -37,16 +37,18 @@ class ValidatorDB(ValidatorDBInterface):
                 """
                 INSERT INTO performance_snapshots (
                     hotkey, timestamp,
-                    total_volume_usd, weighted_volume, trade_count, realized_profit_usd,
-                    unrealized_profit_usd, win_rate, total_fees_paid_usd,
-                    open_positions_count, referral_count, referral_volume
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    total_volume_usd, weighted_volume, profit, trade_count,
+                    realized_profit_usd, unrealized_profit_usd, win_rate,
+                    total_fees_paid_usd, open_positions_count,
+                    referral_count, referral_volume
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     hotkey,
                     timestamp,
                     perf.get("total_volume_usd"),
                     perf.get("weighted_volume"),
+                    perf.get("profit"),
                     perf.get("trade_count"),
                     perf.get("realized_profit_usd"),
                     perf.get("unrealized_profit_usd"),
@@ -114,6 +116,7 @@ class ValidatorDB(ValidatorDBInterface):
                 perf = {
                     "total_volume_usd": data["total_volume_usd"],
                     "weighted_volume": data["weighted_volume"],
+                    "profit": data.get("profit"),
                     "trade_count": data["trade_count"],
                     "realized_profit_usd": data["realized_profit_usd"],
                     "unrealized_profit_usd": data["unrealized_profit_usd"],
